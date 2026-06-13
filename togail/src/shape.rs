@@ -1,3 +1,7 @@
+use crate::ROWS;
+
+type Position = [usize; 2];
+
 pub enum ShapeType {
     I,
     O,
@@ -16,8 +20,9 @@ pub enum Orientation {
 }
 
 pub struct Shape {
-    shape_type: ShapeType,
-    orientation: Orientation,
+    pub shape_type: ShapeType,
+    pub orientation: Orientation,
+    pub position: Position,
 }
 
 impl Shape {
@@ -25,6 +30,7 @@ impl Shape {
         Self {
             shape_type,
             orientation,
+            position: [ROWS / 2, 0],
         }
     }
 }

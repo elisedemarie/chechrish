@@ -6,7 +6,7 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         Self {
             shape: None,
             cells: [[false; COLS]; ROWS],

@@ -1,4 +1,6 @@
 #![no_std]
+
+use crate::board::Board;
 extern crate alloc;
 
 mod shape;
@@ -19,7 +21,7 @@ pub enum Input {
 }
 
 pub struct Frame {
-    pub board: [[bool; COLS]; ROWS],
+    pub board: Board,
     pub score: u32,
     pub level: u32,
 }
