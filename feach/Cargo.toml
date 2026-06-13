@@ -1,0 +1,8 @@
+[package]
+name = "feach"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+togail = { path = "../togail" }
+minifb = "0.27"

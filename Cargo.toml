@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "togail",
+    "feach",
+]
+resolver = "2"
