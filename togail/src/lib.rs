@@ -3,6 +3,7 @@ extern crate alloc;
 
 mod shape;
 mod board;
+mod game;
 
 pub const COLS: usize = 10;
 pub const ROWS: usize = 20;

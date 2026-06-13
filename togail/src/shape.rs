@@ -1,4 +1,3 @@
-use crate::COLS;
 use alloc::vec::Vec;
 use alloc::vec;
 
@@ -107,6 +106,27 @@ impl Shape {
         }
     } 
 
+    pub fn make_new_shape() -> Self {
+        // TODO make random
+        Self {
+            shape_type: ShapeType::Z,
+            orientation: Orientation::North,
+            position: Position::start_position()
+
+        }
+    }
+
+    pub fn move_left(&mut self) {
+        self.position.x -= 1;
+    }
+
+    pub fn move_right(&mut self) {
+        self.position.x += 1;
+    }
+
+    pub fn move_down(&mut self) {
+        self.position.y += 1;
+    }
 }
 
 fn rotate_shape(positions: Vec<Position>) -> Vec<Position> {
