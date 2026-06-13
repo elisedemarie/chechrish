@@ -1,6 +1,8 @@
-use crate::{Input, board::Board, shape::Shape};
+use crate::{Frame, GRAVITY_TICK, Input, board::Board, shape::Shape};
 
-enum GameState {
+
+#[derive(Debug, Clone, Copy)]
+pub enum GameState {
     MakeNewShape,
     MergeShape,
     DropShape,
@@ -8,15 +10,21 @@ enum GameState {
     CheckRows,
 }
 
-impl GameState {
-}
-
 pub struct Game {
     board: Board,
     state: GameState, 
+    clock: u32,
 }
 
 impl Game {
+    pub fn new() -> Self {
+        Self {
+            board: Board::default(),
+            state: GameState::MakeNewShape,
+            clock: 0,
+        }
+    }
+
     fn make_new_shape(&mut self) {
         let new_shape = Shape::make_new_shape();
         self.board.add_shape(new_shape);
@@ -51,4 +59,58 @@ impl Game {
             GameState::MergeShape => self.merge_shape(),
         }
     }
+
+    pub fn tick(&mut self, inputs: &[Input], delta_ms: u32) {
+        // TODO this is a hack to just take the first input.
+        let input = inputs.first().copied();
+        self.clock += delta_ms;
+        if self.clock > GRAVITY_TICK {
+            self.state = GameState::DropShape;
+            self.clock = 0;
+        }
+        self.step_state(input);
+    }
+
+    pub fn get_frame(&self) -> Frame {
+        let buffer = &self.board.render_cells().clone();
+        Frame {
+            board: buffer.clone(),
+            score: 0,
+            level: 1,
+        }
+    }
+
+    pub fn debug_get_state(&self) -> GameState {
+        self.state
+    }
+
+    pub fn debug_get_clock(&self) -> u32 {
+        self.clock
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_game_starts_in_make_new_shape_state() {}
+
+    #[test]
+    fn first_tick_spawns_a_shape() {}
+
+    #[test]
+    fn clock_accumulates_delta_ms_each_tick() {}
+
+    #[test]
+    fn shape_drops_after_gravity_tick_elapses() {}
+
+    #[test]
+    fn clock_resets_after_gravity_fires() {}
+
+    #[test]
+    fn input_moves_shape_left_during_take_input_state() {}
+
+    #[test]
+    fn input_moves_shape_right_during_take_input_state() {}
 }

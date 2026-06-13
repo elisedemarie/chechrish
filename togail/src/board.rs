@@ -32,7 +32,7 @@ impl Board {
         self.cells[row][col] = value; 
     }
 
-    pub fn render_cells(&mut self) -> [[bool; COLS]; ROWS] {
+    pub fn render_cells(&self) -> [[bool; COLS]; ROWS] {
         let mut cells_to_render = self.cells;
         // Include shape cells for render.
         if let Some(shape) = &self.shape {
@@ -67,5 +67,53 @@ impl Board {
             _ => ()
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shape::{Orientation, ShapeType};
+
+    #[test]
+    fn new_board_is_all_empty() {}
+
+    #[test]
+    fn set_cell_marks_cell_as_filled() {}
+
+    #[test]
+    fn add_shape_makes_it_visible_in_render() {}
+
+    #[test]
+    fn render_cells_without_shape_returns_grid_only() {}
+
+    #[test]
+    fn drop_shape_increments_y_position() {}
+
+    #[test]
+    fn merge_shape_bakes_cells_into_grid() {}
+
+    #[test]
+    fn merge_shape_removes_active_shape() {}
+
+    #[test]
+    fn full_row_is_cleared_by_check_rows() {}
+
+    #[test]
+    fn partial_row_is_not_cleared_by_check_rows() {}
+
+    #[test]
+    fn transform_left_moves_shape_left() {}
+
+    #[test]
+    fn transform_right_moves_shape_right() {}
+
+    #[test]
+    fn transform_soft_drop_moves_shape_down() {}
+
+    #[test]
+    fn transform_with_no_input_does_nothing() {}
+
+    #[test]
+    fn transform_with_no_shape_does_nothing() {}
 }
 
