@@ -1,4 +1,4 @@
-use crate::{Frame, GRAVITY_TICK, Input, board::Board, shape::Shape};
+use crate::{Frame, GRAVITY_TICK, Input, board::Board, game::GameState::GameOver, shape::Shape};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
@@ -7,6 +7,7 @@ pub enum GameState {
     DropShape,
     TakeInput,
     CheckRows,
+    GameOver,
 }
 
 pub struct Game {
@@ -25,8 +26,11 @@ impl Game {
     }
 
     fn make_new_shape(&mut self) {
-        self.board.add_new_shape();
-        self.state = GameState::TakeInput;
+        if self.board.add_new_shape(){
+            self.state = GameState::TakeInput;
+        } else {
+            self.state = GameState::GameOver;
+        };
     }
 
     fn drop_shape(&mut self) {
@@ -63,11 +67,15 @@ impl Game {
             GameState::CheckRows => self.check_rows(),
             GameState::TakeInput => self.take_input(input),
             GameState::MergeShape => self.merge_shape(),
+            GameState::GameOver => (),
         }
     }
 
     pub fn tick(&mut self, inputs: &[Input], delta_ms: u32) {
         // TODO this is a hack to just take the first input.
+        if self.state == GameOver {
+            return;
+        };
         let input = inputs.first().copied();
         self.clock += delta_ms;
         if self.clock > GRAVITY_TICK {
@@ -167,5 +175,14 @@ mod tests {
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.state, GameState::MakeNewShape);
+    }
+
+    #[test]
+    fn game_over_stays_in_game_over() {
+        let mut game = Game::default();
+        game.state = GameState::GameOver;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, GRAVITY_TICK +1);
+        assert_eq!(game.state, GameState::GameOver)
     }
 }

@@ -10,15 +10,6 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn new(shape: Option<Shape>, shape_position: Option<Position>) -> Self {
-        let cells = [[false; COLS]; ROWS];
-        Self {
-            shape,
-            shape_position,
-            cells,
-        }
-    }
-
     pub fn default() -> Self {
         Self {
             shape: None,
@@ -33,6 +24,20 @@ impl Board {
 
     pub fn get_shape_pos(&self) -> &Option<Position> {
         &self.shape_position
+    }
+
+    pub fn add_new_shape(&mut self) -> bool {
+        // TODO Make random
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let position = Position::new(0, 0);
+        let shape_cells = shape.get_cells().map(|it| it + position);
+        if self.check_collision(&shape_cells) {
+            self.shape = Some(shape);
+            self.shape_position = Some(position);
+            true
+        } else {
+            false 
+        }
     }
 
     pub fn move_shape(&mut self, input: Input) {
@@ -99,14 +104,6 @@ impl Board {
         if self.check_collision(&new_cells) {
             self.shape = Some(new_shape);
         }
-    }
-
-    pub fn add_new_shape(&mut self) {
-        // TODO Make random
-        let shape = Shape::new(ShapeType::Z, Orientation::North);
-        let position = Position::new(0, 0);
-        self.shape = Some(shape);
-        self.shape_position = Some(position)
     }
 
     pub fn merge_shape(&mut self) {
@@ -352,5 +349,22 @@ mod tests {
         board.cells[2][0] = true;
         let res = board.drop_shape();
         assert_eq!(res, true)
+    }
+
+    #[test]
+    fn full_board_does_not_make_shape() {
+        let mut board = Board::default();
+        board.cells = [[true; COLS]; ROWS];
+        board.add_new_shape(); 
+        assert!(board.shape.is_none());
+        assert!(board.shape_position.is_none());
+    }
+
+    #[test]
+    fn full_board_returns_false_on_make_new_shape() {
+        let mut board = Board::default();
+        board.cells = [[true; COLS]; ROWS];
+        let res = board.add_new_shape(); 
+        assert_eq!(res, false)
     }
 }
