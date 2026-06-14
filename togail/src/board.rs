@@ -36,19 +36,17 @@ impl Board {
     }
 
     pub fn move_shape(&mut self, input: Input) {
-        let increment = match input {
-            Input::Left => -1,
-            Input::Right => 1,
+        let vec = match input {
+            Input::Left => Position::new(-1, 0),
+            Input::Right => Position::new(1, 0),
+            Input::SoftDrop => Position::new(0, 1),
             _ => return,
         };
         let Some(pos) = self.shape_position else {
             return;
         };
         let Some(shape) = &mut self.shape else { return };
-        let new_pos = Position {
-            x: pos.x + increment,
-            y: pos.y,
-        };
+        let new_pos = pos + vec;
         let shape_cells = shape.get_cells().clone();
         let new_cells = shape_cells.map(|pos| pos + new_pos);
         if self.check_collision(&new_cells) {
@@ -140,19 +138,21 @@ impl Board {
         cells_to_render
     }
 
-    fn calculate_row_sum(&self, row_idx: usize) -> usize {
-        self.cells[row_idx].iter().filter(|&&it| it).count()
-    }
-
     pub fn check_rows(&mut self) {
-        let mut row_idx = ROWS - 1;
-        while self.calculate_row_sum(row_idx) > 0 {
-            if self.calculate_row_sum(row_idx) == COLS {
-                self.cells[row_idx] = [false; COLS];
+        let mut row_idx = 0;
+        while row_idx < ROWS {
+            let row_sum = calc_row_sum(self.cells[row_idx]);
+            if row_sum == COLS {
+                self.cells[row_idx] = [false; COLS]; 
+                self.cells[0..=row_idx].rotate_right(1);
             }
-            row_idx += 1;
-        }
+            row_idx += 1
+        } 
     }
+}
+
+fn calc_row_sum(row: [bool; COLS]) -> usize {
+    row.iter().filter(|&&it| it).count()
 }
 
 #[cfg(test)]
@@ -213,29 +213,144 @@ mod tests {
 
     #[test]
     fn full_row_is_cleared_by_check_rows() {
-        let row_idx = 3;
         let mut board = Board::default();
-        board.cells[row_idx] = [true; COLS];
+        board.cells[ROWS-1] = [true; COLS];
         board.check_rows();
         let cells = board.cells;
         assert!(cells.iter().all(|col| col.iter().all(|cell| !*cell)))
     }
 
     #[test]
-    fn partial_row_is_not_cleared_by_check_rows() {}
+    fn partial_row_is_not_cleared_by_check_rows() {
+        let mut board = Board::default();
+        let mut partial_row = [true; COLS];
+        partial_row[1] = false;
+        board.cells[ROWS-1] = partial_row.clone();
+        board.check_rows();
+        let cells = board.cells;
+        assert!(cells.iter().any(|col| col.iter().any(|cell| *cell)))
+    }
 
     #[test]
-    fn transform_left_moves_shape_left() {}
+    fn cleared_row_drops_row_above() {
+        let mut board = Board::default();
+        let mut partial_row = [true; COLS];
+        partial_row[1] = false;
+        board.cells[ROWS-1] = [true; COLS];
+        board.cells[ROWS-2] = partial_row.clone();
+        board.check_rows();
+        let cells = board.cells;
+        assert_eq!(cells[ROWS-1], partial_row);
+    }
 
     #[test]
-    fn transform_right_moves_shape_right() {}
+    fn multiple_cleared_row_drops_above_rows_fully() {
+        let mut board = Board::default();
+        let mut partial_row = [true; COLS];
+        partial_row[1] = false;
+        board.cells[ROWS-1] = [true; COLS];
+        board.cells[ROWS-2] = [true; COLS];
+        board.cells[ROWS-3] = [true; COLS];
+        board.cells[ROWS-4] = partial_row.clone();
+        board.check_rows();
+        let cells = board.cells;
+        assert_eq!(cells[ROWS-1], partial_row);
+    }
 
     #[test]
-    fn transform_soft_drop_moves_shape_down() {}
+    fn transform_left_moves_shape_left() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let x_0 = 2;
+        let pos_0 = Position::new(x_0, 0);
+        let input = Input::Left;
+        board.shape = Some(shape);
+        board.shape_position = Some(pos_0);
+        board.move_shape(input);
+        let x_1 = board.shape_position.unwrap().x;
+        assert_eq!(x_1, x_0 - 1);
+    }
 
     #[test]
-    fn transform_with_no_input_does_nothing() {}
+    fn transform_right_moves_shape_right() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let x_0 = 2;
+        let pos_0 = Position::new(x_0, 0);
+        let input = Input::Right;
+        board.shape = Some(shape);
+        board.shape_position = Some(pos_0);
+        board.move_shape(input);
+        let x_1 = board.shape_position.unwrap().x;
+        assert_eq!(x_1, x_0 + 1);
+    }
 
     #[test]
-    fn transform_with_no_shape_does_nothing() {}
+    fn transform_soft_drop_moves_shape_down() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let y_0 = 0;
+        let pos_0 = Position::new(2, y_0);
+        let input = Input::SoftDrop;
+        board.shape = Some(shape);
+        board.shape_position = Some(pos_0);
+        board.move_shape(input);
+        let y_1 = board.shape_position.unwrap().y;
+        assert_eq!(y_1, y_0 + 1);
+    }
+
+    #[test]
+    fn transform_with_no_shape_does_nothing() {
+        let mut board = Board::default();
+        let input = Input::Left;
+        board.move_shape(input);
+        let cells = board.cells;
+        assert!(cells.iter().all(|col| col.iter().all(|cell| !*cell)))
+    }
+
+    #[test]
+    fn shape_on_bottom_returns_false_for_drop() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let shape_pos = Position::new(0, ROWS as isize-2);
+        board.shape = Some(shape);
+        board.shape_position = Some(shape_pos);
+        let res = board.drop_shape();
+        assert_eq!(res, false)
+    }
+
+    #[test]
+    fn shape_not_on_bottom_returns_true_for_drop() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let shape_pos = Position::new(0, 0);
+        board.shape = Some(shape);
+        board.shape_position = Some(shape_pos);
+        let res = board.drop_shape();
+        assert_eq!(res, true)
+    }
+
+    #[test]
+    fn shape_on_single_block_does_not_drop() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let shape_pos = Position::new(0, 0);
+        board.shape = Some(shape);
+        board.shape_position = Some(shape_pos);
+        board.cells[2][1] = true;
+        let res = board.drop_shape();
+        assert_eq!(res, false)
+    }
+
+    #[test]
+    fn shape_not_fully_on_single_block_does_drop() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let shape_pos = Position::new(0, 0);
+        board.shape = Some(shape);
+        board.shape_position = Some(shape_pos);
+        board.cells[2][0] = true;
+        let res = board.drop_shape();
+        assert_eq!(res, true)
+    }
 }

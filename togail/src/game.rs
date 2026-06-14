@@ -39,7 +39,7 @@ impl Game {
 
     fn merge_shape(&mut self) {
         self.board.merge_shape();
-        self.state = GameState::MakeNewShape;
+        self.state = GameState::CheckRows;
     }
 
     fn check_rows(&mut self) {
@@ -50,7 +50,7 @@ impl Game {
     fn take_input(&mut self, input: Option<Input>) {
         let Some(input) = input else { return };
         match input {
-            Input::Left | Input::Right => self.board.move_shape(input),
+            Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
             Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
             _ => ()
         }
@@ -85,34 +85,12 @@ impl Game {
             level: 1,
         }
     }
-
-    pub fn debug_get_state(&self) -> GameState {
-        self.state
-    }
-
-    pub fn debug_get_clock(&self) -> u32 {
-        self.clock
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::shape::{Orientation, Position, ShapeType};
 
     use super::*;
-
-    fn make_game_for_input() -> Game {
-        let shape = Shape {
-            shape_type: ShapeType::Z,
-            orientation: Orientation::North,
-        };
-        let position = Position::new(3, 3);
-        Game {
-            board: Board::new(Some(shape), Some(position)),
-            state: GameState::TakeInput,
-            clock: 0,
-        }
-    }
 
     #[test]
     fn new_game_starts_in_make_new_shape_state() {
@@ -156,22 +134,38 @@ mod tests {
     }
 
     #[test]
-    fn input_moves_shape_left_during_take_input_state() {
-        let mut game = make_game_for_input();
-        let x_0 = game.board.get_shape_pos().unwrap().x;
-        let inputs = [Input::Left];
-        game.tick(&inputs, 16);
-        let x_1 = game.board.get_shape_pos().unwrap().x;
-        assert_eq!(x_1, x_0 - 1);
+    fn make_new_shape_state_moves_to_take_input() {
+        let mut game = Game::default();
+        game.state = GameState::MakeNewShape;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
-    fn input_moves_shape_right_during_take_input_state() {
-        let mut game = make_game_for_input();
-        let x_0 = game.board.get_shape_pos().unwrap().x;
-        let inputs = [Input::Right];
-        game.tick(&inputs, 16);
-        let x_1 = game.board.get_shape_pos().unwrap().x;
-        assert_eq!(x_1, x_0 + 1);
+    fn take_input_transitions_to_take_input() {
+        let mut game = Game::default();
+        game.state = GameState::TakeInput;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.state, GameState::TakeInput);
+    }
+
+    #[test]
+    fn merge_shape_transitions_to_check_rows() {
+        let mut game = Game::default();
+        game.state = GameState::MergeShape;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.state, GameState::CheckRows);
+    }
+
+    #[test]
+    fn check_rows_transitions_to_make_new_shape() {
+        let mut game = Game::default();
+        game.state = GameState::CheckRows;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.state, GameState::MakeNewShape);
     }
 }

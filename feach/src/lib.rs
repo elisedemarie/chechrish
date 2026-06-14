@@ -32,14 +32,9 @@ pub fn should_quit(inputs: &[Input]) -> bool {
     inputs.iter().any(|i| matches!(i, Input::Quit))
 }
 
-pub fn run(mut frame_source: impl FnMut(&[Input]) -> Frame) {
-    let mut window = Window::new(
-        "chechrish",
-        WIDTH,
-        HEIGHT,
-        WindowOptions::default(),
-    )
-    .expect("failed to create window");
+pub fn run(mut frame_source: impl FnMut(&[Input], u32) -> Frame) {
+    let mut window = Window::new("chechrish", WIDTH, HEIGHT, WindowOptions::default())
+        .expect("failed to create window");
 
     window.set_target_fps(60);
 
@@ -54,7 +49,7 @@ pub fn run(mut frame_source: impl FnMut(&[Input]) -> Frame) {
             break;
         }
 
-        let frame = frame_source(&inputs);
+        let frame = frame_source(&inputs, 16);
         let pixels = board_to_pixels(&frame.board, SCALE);
 
         window
@@ -142,7 +137,10 @@ mod tests {
         for dy in 0..scale {
             for dx in 0..scale {
                 let idx = (row * scale + dy) * width + (col * scale + dx);
-                assert_eq!(pixels[idx], WHITE, "expected white at pixel ({dx},{dy}) within cell ({col},{row})");
+                assert_eq!(
+                    pixels[idx], WHITE,
+                    "expected white at pixel ({dx},{dy}) within cell ({col},{row})"
+                );
             }
         }
     }
