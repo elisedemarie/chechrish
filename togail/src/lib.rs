@@ -1,10 +1,10 @@
 #![no_std]
 extern crate alloc;
 
-mod shape;
 mod board;
 mod game;
 mod input;
+mod shape;
 
 pub use input::Input;
 

@@ -9,4 +9,3 @@ pub enum Input {
     Pause,
     Quit,
 }
-
