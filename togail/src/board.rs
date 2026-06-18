@@ -3,14 +3,20 @@ use crate::{
     shape::{Orientation, Position, Shape, ShapeType},
 };
 
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum DropOutcome { Dropped, Landed, NoShape }
+
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum SpawnOutcome { Spawned, FullBoard }
+
 pub struct Board {
     shape: Option<Shape>,
     shape_position: Option<Position>,
     cells: [[bool; COLS]; ROWS],
 }
 
-impl Board {
-    pub fn default() -> Self {
+impl Default for Board {
+    fn default() -> Self {
         Self {
             shape: None,
             shape_position: None,
@@ -18,6 +24,9 @@ impl Board {
         }
     }
 
+}
+
+impl Board {
     pub fn get_shape(&self) -> &Option<Shape> {
         &self.shape
     }
@@ -26,7 +35,7 @@ impl Board {
         &self.shape_position
     }
 
-    pub fn add_new_shape(&mut self) -> bool {
+    pub fn add_new_shape(&mut self) -> SpawnOutcome {
         // TODO Make random
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let position = Position::new(0, 0);
@@ -34,9 +43,9 @@ impl Board {
         if self.check_collision(&shape_cells) {
             self.shape = Some(shape);
             self.shape_position = Some(position);
-            true
+            SpawnOutcome::Spawned
         } else {
-            false 
+            SpawnOutcome::FullBoard
         }
     }
 
@@ -73,18 +82,18 @@ impl Board {
         return true;
     }
 
-    pub fn drop_shape(&mut self) -> bool {
-        let Some(shape_position) = self.shape_position else {return true};
-        let Some(shape) = self.shape else {return true};
+    pub fn drop_shape(&mut self) -> DropOutcome {
+        let Some(shape_position) = self.shape_position else {return DropOutcome::NoShape };
+        let Some(shape) = self.shape else {return return DropOutcome::NoShape };
         let mut new_pos = shape_position;
         new_pos.y += 1;
         let shape_cells = shape.get_cells().clone();
         let new_cells = shape_cells.map(|pos| pos + new_pos);
         if self.check_collision(&new_cells) {
             self.shape_position = Some(new_pos);
-            return true
+            DropOutcome::Dropped
         } else {
-            return false
+            DropOutcome::Landed
         }
     }
 
@@ -155,7 +164,7 @@ fn calc_row_sum(row: [bool; COLS]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shape::{Orientation, ShapeType};
+    use crate::{board::{DropOutcome::Dropped, SpawnOutcome::FullBoard}, shape::{Orientation, ShapeType}};
 
     #[test]
     fn new_board_is_all_empty() {
@@ -306,25 +315,25 @@ mod tests {
     }
 
     #[test]
-    fn shape_on_bottom_returns_false_for_drop() {
+    fn shape_on_bottom_returns_landed_for_drop() {
         let mut board = Board::default();
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let shape_pos = Position::new(0, ROWS as isize-2);
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
         let res = board.drop_shape();
-        assert_eq!(res, false)
+        assert_eq!(res, DropOutcome::Landed)
     }
 
     #[test]
-    fn shape_not_on_bottom_returns_true_for_drop() {
+    fn shape_not_on_bottom_returns_dropped_for_drop() {
         let mut board = Board::default();
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let shape_pos = Position::new(0, 0);
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
         let res = board.drop_shape();
-        assert_eq!(res, true)
+        assert_eq!(res, DropOutcome::Dropped)
     }
 
     #[test]
@@ -336,7 +345,7 @@ mod tests {
         board.shape_position = Some(shape_pos);
         board.cells[2][1] = true;
         let res = board.drop_shape();
-        assert_eq!(res, false)
+        assert_eq!(res, DropOutcome::Landed)
     }
 
     #[test]
@@ -348,7 +357,7 @@ mod tests {
         board.shape_position = Some(shape_pos);
         board.cells[2][0] = true;
         let res = board.drop_shape();
-        assert_eq!(res, true)
+        assert_eq!(res, DropOutcome::Dropped)
     }
 
     #[test]
@@ -361,10 +370,17 @@ mod tests {
     }
 
     #[test]
-    fn full_board_returns_false_on_make_new_shape() {
+    fn full_board_returns_full_board_on_make_new_shape() {
         let mut board = Board::default();
         board.cells = [[true; COLS]; ROWS];
         let res = board.add_new_shape(); 
-        assert_eq!(res, false)
+        assert_eq!(res, SpawnOutcome::FullBoard)
+    }
+
+    #[test]
+    fn drop_without_shape_returns_no_shape() {
+        let mut board = Board::default();
+        let res = board.drop_shape(); 
+        assert_eq!(res, DropOutcome::NoShape)
     }
 }
