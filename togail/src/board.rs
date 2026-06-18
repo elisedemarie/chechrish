@@ -68,7 +68,7 @@ impl Board {
         };
         let Some(shape) = &mut self.shape else { return };
         let new_pos = pos + vec;
-        let shape_cells = shape.get_cells().clone();
+        let shape_cells = shape.get_cells();
         let new_cells = shape_cells.map(|pos| pos + new_pos);
         if self.is_valid_placement(&new_cells) {
             self.shape_position = Some(new_pos)
@@ -143,13 +143,13 @@ impl Board {
 
     pub fn render_cells(&self) -> [[bool; COLS]; ROWS] {
         let mut cells_to_render = self.cells;
-        if let Some(shape) = &self.shape {
-            if let Some(pos) = self.shape_position {
-                for cell in shape.get_cells() {
-                    let pos_on_board = cell + pos;
-                    cells_to_render[pos_on_board.y as usize][pos_on_board.x as usize] = true;
-                }
-            };
+        if let Some(shape) = &self.shape
+            && let Some(pos) = self.shape_position
+        {
+            for cell in shape.get_cells() {
+                let pos_on_board = cell + pos;
+                cells_to_render[pos_on_board.y as usize][pos_on_board.x as usize] = true;
+            }
         }
         cells_to_render
     }

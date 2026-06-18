@@ -89,7 +89,7 @@ impl Game {
     pub fn get_frame(&self) -> Frame {
         let buffer = &self.board.render_cells();
         Frame {
-            board: buffer.clone(),
+            board: *buffer,
             score: 0,
             level: 1,
         }
