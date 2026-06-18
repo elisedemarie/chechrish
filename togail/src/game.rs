@@ -73,6 +73,10 @@ impl Game {
         match input {
             Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
             Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
+            Input::HardDrop => {
+                self.board.hard_drop();
+                self.game_state = GameState::MergeShape;
+            }
             _ => (),
         }
     }
@@ -225,6 +229,14 @@ mod tests {
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.game_state, GameState::MakeNewShape);
+    }
+
+    #[test]
+    fn hard_drop_input_immediately_transitions_to_merge_shape() {
+        let mut game = Game::default();
+        game.tick(&[], 1); // spawn shape → TakeInput
+        game.tick(&[Input::HardDrop], 1);
+        assert_eq!(game.game_state, GameState::MergeShape);
     }
 
     #[test]

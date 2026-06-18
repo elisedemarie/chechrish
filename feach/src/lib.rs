@@ -32,23 +32,96 @@ pub fn should_quit(inputs: &[Input]) -> bool {
     inputs.iter().any(|i| matches!(i, Input::Quit))
 }
 
+const DAS_MS: u32 = 167;
+const ARR_MS: u32 = 33;
+
+const ALL_INPUTS: [Input; 8] = [
+    Input::Left,
+    Input::Right,
+    Input::RotateCw,
+    Input::RotateCcw,
+    Input::SoftDrop,
+    Input::HardDrop,
+    Input::Pause,
+    Input::Quit,
+];
+
+fn input_index(input: Input) -> usize {
+    match input {
+        Input::Left => 0,
+        Input::Right => 1,
+        Input::RotateCw => 2,
+        Input::RotateCcw => 3,
+        Input::SoftDrop => 4,
+        Input::HardDrop => 5,
+        Input::Pause => 6,
+        Input::Quit => 7,
+    }
+}
+
+pub struct InputHandler {
+    held_ms: [u32; 8],
+}
+
+impl InputHandler {
+    pub fn new() -> Self {
+        Self { held_ms: [0; 8] }
+    }
+
+    pub fn process(&mut self, active: &[Input], delta_ms: u32) -> Vec<Input> {
+        let mut is_active = [false; 8];
+        for &input in active {
+            is_active[input_index(input)] = true;
+        }
+
+        let mut result = Vec::new();
+        for (i, &input) in ALL_INPUTS.iter().enumerate() {
+            if is_active[i] {
+                let prev = self.held_ms[i];
+                self.held_ms[i] = self.held_ms[i].saturating_add(delta_ms);
+                let cur = self.held_ms[i];
+
+                let fires = match input {
+                    Input::HardDrop | Input::Pause | Input::Quit => prev == 0,
+                    Input::Left | Input::Right | Input::RotateCw | Input::RotateCcw => {
+                        prev == 0
+                            || (prev < DAS_MS && cur >= DAS_MS)
+                            || (prev >= DAS_MS && prev / ARR_MS < cur / ARR_MS)
+                    }
+                    Input::SoftDrop => true,
+                };
+
+                if fires {
+                    result.push(input);
+                }
+            } else {
+                self.held_ms[i] = 0;
+            }
+        }
+        result
+    }
+}
+
 pub fn run(mut frame_source: impl FnMut(&[Input], u32) -> Frame) {
     let mut window = Window::new("chechrish", WIDTH, HEIGHT, WindowOptions::default())
         .expect("failed to create window");
 
     window.set_target_fps(60);
 
+    let mut input_handler = InputHandler::new();
+
     while window.is_open() {
-        let inputs: Vec<Input> = window
+        let raw: Vec<Input> = window
             .get_keys()
             .iter()
             .filter_map(|&k| map_key(k))
             .collect();
 
-        if should_quit(&inputs) {
+        if should_quit(&raw) {
             break;
         }
 
+        let inputs = input_handler.process(&raw, 16);
         let frame = frame_source(&inputs, 16);
         let pixels = board_to_pixels(&frame.board, SCALE);
 
@@ -283,5 +356,87 @@ mod tests {
     #[test]
     fn quit_among_other_inputs_signals_quit() {
         assert!(should_quit(&[Input::Left, Input::Quit, Input::Right]));
+    }
+
+    // InputHandler tests
+
+    #[test]
+    fn rotation_fires_on_initial_press() {
+        let mut handler = InputHandler::new();
+        let result = handler.process(&[Input::RotateCw], 16);
+        assert!(result.contains(&Input::RotateCw));
+    }
+
+    #[test]
+    fn rotation_does_not_fire_during_das_delay() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::RotateCw], 16);
+        let result = handler.process(&[Input::RotateCw], 16);
+        assert!(!result.contains(&Input::RotateCw));
+    }
+
+    #[test]
+    fn rotation_fires_again_after_das_delay() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::RotateCw], 16);
+        let result = handler.process(&[Input::RotateCw], DAS_MS);
+        assert!(result.contains(&Input::RotateCw));
+    }
+
+    #[test]
+    fn rotation_fires_again_after_release_and_repress() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::RotateCw], 16);
+        handler.process(&[], 16);
+        let result = handler.process(&[Input::RotateCw], 16);
+        assert!(result.contains(&Input::RotateCw));
+    }
+
+    #[test]
+    fn movement_fires_on_initial_press() {
+        let mut handler = InputHandler::new();
+        let result = handler.process(&[Input::Left], 16);
+        assert!(result.contains(&Input::Left));
+    }
+
+    #[test]
+    fn movement_does_not_fire_during_das_delay() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::Left], 16);
+        let result = handler.process(&[Input::Left], 16);
+        assert!(!result.contains(&Input::Left));
+    }
+
+    #[test]
+    fn movement_fires_again_after_das_delay() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::Left], 16);
+        let result = handler.process(&[Input::Left], DAS_MS);
+        assert!(result.contains(&Input::Left));
+    }
+
+    #[test]
+    fn movement_repeats_at_arr_rate_after_das() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::Left], 16);
+        handler.process(&[Input::Left], DAS_MS);
+        let result = handler.process(&[Input::Left], ARR_MS);
+        assert!(result.contains(&Input::Left));
+    }
+
+    #[test]
+    fn soft_drop_fires_every_frame_while_held() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::SoftDrop], 16);
+        let result = handler.process(&[Input::SoftDrop], 16);
+        assert!(result.contains(&Input::SoftDrop));
+    }
+
+    #[test]
+    fn released_key_does_not_fire() {
+        let mut handler = InputHandler::new();
+        handler.process(&[Input::Left], 16);
+        let result = handler.process(&[], 16);
+        assert!(!result.contains(&Input::Left));
     }
 }

@@ -1,4 +1,4 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Input {
     Left,
     Right,

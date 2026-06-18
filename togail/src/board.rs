@@ -43,7 +43,8 @@ impl Board {
 
     pub fn add_new_shape(&mut self, shape_type: ShapeType) -> SpawnOutcome {
         let shape = Shape::new(shape_type, Orientation::North);
-        let position = Position::new(0, 0);
+        let spawn_col = (COLS - shape.shape_type.shape_size()) / 2;
+        let position = Position::new(spawn_col as isize, 0);
         let shape_cells = shape.get_cells().map(|it| it + position);
         if self.is_valid_placement(&shape_cells) {
             self.shape = Some(shape);
@@ -71,6 +72,10 @@ impl Board {
         if self.is_valid_placement(&new_cells) {
             self.shape_position = Some(new_pos)
         }
+    }
+
+    pub fn hard_drop(&mut self) {
+        while self.drop_shape() == DropOutcome::Dropped {}
     }
 
     fn is_valid_placement(&self, positions: &[Position]) -> bool {
@@ -366,6 +371,44 @@ mod tests {
         board.cells[2][0] = true;
         let res = board.drop_shape();
         assert_eq!(res, DropOutcome::Dropped)
+    }
+
+    #[test]
+    fn hard_drop_on_empty_board_piece_cannot_drop_further() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        board.shape = Some(shape);
+        board.shape_position = Some(Position::new(0, 0));
+        board.hard_drop();
+        assert_eq!(board.drop_shape(), DropOutcome::Landed);
+    }
+
+    #[test]
+    fn hard_drop_with_obstacle_piece_rests_on_top_of_it() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        board.shape = Some(shape);
+        board.shape_position = Some(Position::new(0, 0));
+        // Z North at (0,y): bottom-right cell is (1, y+1). Blocking row 5 col 1
+        // forces the piece to rest at y=3 (its (1,y+2) would be row 5).
+        board.cells[5][1] = true;
+        board.hard_drop();
+        assert_eq!(board.get_shape_pos().unwrap().y, 3);
+    }
+
+    #[test]
+    fn hard_drop_does_not_move_piece_into_existing_cells() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::O, Orientation::North);
+        board.shape = Some(shape);
+        board.shape_position = Some(Position::new(0, 0));
+        // O piece (2×2) at x=0 occupies cols 0-1. Fill the bottom row at those cols.
+        board.cells[ROWS - 1][0] = true;
+        board.cells[ROWS - 1][1] = true;
+        board.hard_drop();
+        // bottom cells of the piece (row y+1) must be clear of the blocked row
+        let y = board.get_shape_pos().unwrap().y;
+        assert!((y + 1) as usize != ROWS - 1);
     }
 
     #[test]
