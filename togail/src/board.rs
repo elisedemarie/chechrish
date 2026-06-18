@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub enum DropOutcome { Dropped, Landed, NoShape }
+pub enum DropOutcome { Dropped, Landed }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum SpawnOutcome { Spawned, FullBoard }
@@ -83,8 +83,8 @@ impl Board {
     }
 
     pub fn drop_shape(&mut self) -> DropOutcome {
-        let Some(shape_position) = self.shape_position else {return DropOutcome::NoShape };
-        let Some(shape) = self.shape else {return return DropOutcome::NoShape };
+        let shape_position = self.shape_position.expect("There should be a shape position here!");
+        let shape = self.shape.expect("There should be a shape here!");
         let mut new_pos = shape_position;
         new_pos.y += 1;
         let shape_cells = shape.get_cells().clone();
@@ -375,12 +375,5 @@ mod tests {
         board.cells = [[true; COLS]; ROWS];
         let res = board.add_new_shape(); 
         assert_eq!(res, SpawnOutcome::FullBoard)
-    }
-
-    #[test]
-    fn drop_without_shape_returns_no_shape() {
-        let mut board = Board::default();
-        let res = board.drop_shape(); 
-        assert_eq!(res, DropOutcome::NoShape)
     }
 }

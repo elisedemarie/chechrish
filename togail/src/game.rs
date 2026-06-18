@@ -35,7 +35,6 @@ impl Game {
     fn drop_shape(&mut self) {
         self.clock = 0;
         self.state = match self.board.drop_shape() {
-            DropOutcome::NoShape => GameState::MakeNewShape,
             DropOutcome::Landed => GameState::MergeShape,
             DropOutcome::Dropped => GameState::TakeInput
         }
@@ -98,9 +97,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn clock_starts_at_0() {
-        let game = Game::default();
-        assert_eq!(game.clock, 0);
+    fn gravity_does_not_fire_after_shape_spawn() {
+        let mut game = Game::default();
+        let inputs = [];
+        game.tick(&inputs, 1); // spawns shape, enters TakeInput
+        game.tick(&inputs, 1); // should stay in TakeInput
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
@@ -169,6 +171,7 @@ mod tests {
     #[test]
     fn clock_resets_after_drop_shape() {
         let mut game = Game::default();
+        game.tick(&[], 16);
         game.clock = GRAVITY_TICK + 10;
         game.drop_shape();
         assert_eq!(game.clock, 0);
