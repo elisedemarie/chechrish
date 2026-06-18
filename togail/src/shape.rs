@@ -22,7 +22,7 @@ impl Add for Position {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ShapeType {
     I,
     O,

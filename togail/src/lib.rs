@@ -5,6 +5,7 @@ mod board;
 mod game;
 mod input;
 mod shape;
+mod random;
 
 pub use input::Input;
 

@@ -1,6 +1,5 @@
 use crate::{
-    COLS, Input, ROWS,
-    shape::{Orientation, Position, Shape, ShapeType},
+    COLS, Input, ROWS, shape::{Orientation, Position, Shape, ShapeType}
 };
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -42,9 +41,8 @@ impl Board {
         self.shape_position
     }
 
-    pub fn add_new_shape(&mut self) -> SpawnOutcome {
-        // TODO Make random
-        let shape = Shape::new(ShapeType::Z, Orientation::North);
+    pub fn add_new_shape(&mut self, shape_type: ShapeType) -> SpawnOutcome {
+        let shape = Shape::new(shape_type, Orientation::North);
         let position = Position::new(0, 0);
         let shape_cells = shape.get_cells().map(|it| it + position);
         if self.is_valid_placement(&shape_cells) {
@@ -195,7 +193,7 @@ mod tests {
     #[test]
     fn add_shape_makes_it_visible_in_render() {
         let mut board = Board::default();
-        board.add_new_shape();
+        board.add_new_shape(ShapeType::Z);
         let cells = board.render_cells();
         assert!(cells.iter().any(|col| col.iter().any(|cell| *cell)))
     }
@@ -203,7 +201,7 @@ mod tests {
     #[test]
     fn drop_shape_increments_y_position() {
         let mut board = Board::default();
-        board.add_new_shape();
+        board.add_new_shape(ShapeType::Z);
         let y_0 = board.shape_position.unwrap().y;
         board.drop_shape();
         let y_1 = board.shape_position.unwrap().y;
@@ -213,7 +211,7 @@ mod tests {
     #[test]
     fn merge_shape_sets_cells_to_true() {
         let mut board = Board::default();
-        board.add_new_shape();
+        board.add_new_shape(ShapeType::Z);
         board.merge_shape();
         let cells = board.cells;
         assert!(cells.iter().any(|col| col.iter().any(|cell| *cell)))
@@ -222,7 +220,7 @@ mod tests {
     #[test]
     fn merge_shape_removes_active_shape() {
         let mut board = Board::default();
-        board.add_new_shape();
+        board.add_new_shape(ShapeType::Z);
         board.merge_shape();
         assert!(board.shape.is_none());
     }
@@ -374,7 +372,7 @@ mod tests {
     fn full_board_does_not_make_shape() {
         let mut board = Board::default();
         board.cells = [[true; COLS]; ROWS];
-        board.add_new_shape();
+        board.add_new_shape(ShapeType::Z);
         assert!(board.shape.is_none());
         assert!(board.shape_position.is_none());
     }
@@ -383,7 +381,7 @@ mod tests {
     fn full_board_returns_full_board_on_make_new_shape() {
         let mut board = Board::default();
         board.cells = [[true; COLS]; ROWS];
-        let res = board.add_new_shape();
+        let res = board.add_new_shape(ShapeType::Z);
         assert_eq!(res, SpawnOutcome::FullBoard)
     }
 }
