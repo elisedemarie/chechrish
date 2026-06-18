@@ -46,7 +46,7 @@ impl ShapeType {
                 Position { x: 0, y: 1 },
                 Position { x: 1, y: 1 },
                 Position { x: 2, y: 1 },
-                Position { x: 1, y: 1 },
+                Position { x: 1, y: 0 },
             ],
             Self::O => [
                 Position { x: 0, y: 0 },
@@ -123,14 +123,6 @@ impl Shape {
                 rotate_shape(rotate_shape(shape_cells, shape_size), shape_size),
                 shape_size,
             ),
-        }
-    }
-
-    pub fn make_new_shape() -> Self {
-        // TODO make random
-        Self {
-            shape_type: ShapeType::Z,
-            orientation: Orientation::North,
         }
     }
 
@@ -231,8 +223,79 @@ mod tests {
             Position::new(2, 2),
             Position::new(2, 3),
         ];
-        let obs = shape.get_cells();
-        assert_positions_equal(&obs, &expected_positions);
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn o_piece_north_is_two_by_two_square() {
+        let shape = Shape::new(ShapeType::O, Orientation::North);
+        let expected_positions = [
+            Position::new(0, 0),
+            Position::new(1, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn t_piece_north_is_t_shape() {
+        let shape = Shape::new(ShapeType::T, Orientation::North);
+        let expected_positions = [
+            Position::new(1, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(2, 1),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn s_piece_north_is_s_shape() {
+        let shape = Shape::new(ShapeType::S, Orientation::North);
+        let expected_positions = [
+            Position::new(1, 0),
+            Position::new(2, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn z_piece_north_is_z_shape() {
+        let shape = Shape::new(ShapeType::Z, Orientation::North);
+        let expected_positions = [
+            Position::new(0, 0),
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(2, 1),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn j_piece_north_is_j_shape() {
+        let shape = Shape::new(ShapeType::J, Orientation::North);
+        let expected_positions = [
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(0, 2),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
+    }
+
+    #[test]
+    fn l_piece_north_is_l_shape() {
+        let shape = Shape::new(ShapeType::L, Orientation::North);
+        let expected_positions = [
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(2, 2),
+        ];
+        assert_positions_equal(&shape.get_cells(), &expected_positions);
     }
 
     // ── rotation ─────────────────────────────────────────────────────────────

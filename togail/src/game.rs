@@ -1,4 +1,7 @@
-use crate::{Frame, GRAVITY_TICK, Input, board::{Board, DropOutcome, SpawnOutcome}};
+use crate::{
+    Frame, GRAVITY_TICK, Input,
+    board::{Board, DropOutcome, SpawnOutcome},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
@@ -16,19 +19,21 @@ pub struct Game {
     clock: u32,
 }
 
-impl Game {
-    pub fn default() -> Self {
+impl Default for Game {
+    fn default() -> Self {
         Self {
             board: Board::default(),
             state: GameState::MakeNewShape,
             clock: 0,
         }
     }
+}
 
+impl Game {
     fn make_new_shape(&mut self) {
         self.state = match self.board.add_new_shape() {
             SpawnOutcome::Spawned => GameState::TakeInput,
-            SpawnOutcome::FullBoard => GameState::GameOver
+            SpawnOutcome::FullBoard => GameState::GameOver,
         };
     }
 
@@ -36,7 +41,7 @@ impl Game {
         self.clock = 0;
         self.state = match self.board.drop_shape() {
             DropOutcome::Landed => GameState::MergeShape,
-            DropOutcome::Dropped => GameState::TakeInput
+            DropOutcome::Dropped => GameState::TakeInput,
         }
     }
 
@@ -53,13 +58,13 @@ impl Game {
     fn take_input(&mut self, input: Option<Input>) {
         if self.clock > GRAVITY_TICK {
             self.state = GameState::DropShape;
-            return
+            return;
         }
         let Some(input) = input else { return };
         match input {
             Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
             Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -82,7 +87,7 @@ impl Game {
     }
 
     pub fn get_frame(&self) -> Frame {
-        let buffer = &self.board.render_cells().clone();
+        let buffer = &self.board.render_cells();
         Frame {
             board: buffer.clone(),
             score: 0,
@@ -124,7 +129,7 @@ mod tests {
         let mut game = Game::default();
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 110);
-        assert!(game.clock > 0);
+        assert_eq!(game.clock, 110);
     }
 
     #[test]
@@ -218,7 +223,7 @@ mod tests {
         let mut game = Game::default();
         game.state = GameState::GameOver;
         let inputs: [Input; 0] = [];
-        game.tick(&inputs, GRAVITY_TICK +1);
+        game.tick(&inputs, GRAVITY_TICK + 1);
         assert_eq!(game.state, GameState::GameOver)
     }
 }
