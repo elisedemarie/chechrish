@@ -1,4 +1,4 @@
-use crate::{Frame, GRAVITY_TICK, Input, board::Board, game::GameState::GameOver, shape::Shape};
+use crate::{Frame, GRAVITY_TICK, Input, board::{Board, DropOutcome, SpawnOutcome}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
@@ -26,19 +26,19 @@ impl Game {
     }
 
     fn make_new_shape(&mut self) {
-        if self.board.add_new_shape(){
-            self.state = GameState::TakeInput;
-        } else {
-            self.state = GameState::GameOver;
+        self.state = match self.board.add_new_shape() {
+            SpawnOutcome::Spawned => GameState::TakeInput,
+            SpawnOutcome::FullBoard => GameState::GameOver
         };
     }
 
     fn drop_shape(&mut self) {
-        if self.board.drop_shape() {
-            self.state = GameState::TakeInput;
-        } else {
-            self.state = GameState::MergeShape;
-        };
+        self.clock = 0;
+        self.state = match self.board.drop_shape() {
+            DropOutcome::NoShape => GameState::MakeNewShape,
+            DropOutcome::Landed => GameState::MergeShape,
+            DropOutcome::Dropped => GameState::TakeInput
+        }
     }
 
     fn merge_shape(&mut self) {
@@ -52,6 +52,10 @@ impl Game {
     }
 
     fn take_input(&mut self, input: Option<Input>) {
+        if self.clock > GRAVITY_TICK {
+            self.state = GameState::DropShape;
+            return
+        }
         let Some(input) = input else { return };
         match input {
             Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
@@ -72,16 +76,9 @@ impl Game {
     }
 
     pub fn tick(&mut self, inputs: &[Input], delta_ms: u32) {
-        // TODO this is a hack to just take the first input.
-        if self.state == GameOver {
-            return;
-        };
+        // HACK: Handle multiple inputs.
         let input = inputs.first().copied();
         self.clock += delta_ms;
-        if self.clock > GRAVITY_TICK {
-            self.state = GameState::DropShape;
-            self.clock = 0;
-        }
         self.step_state(input);
     }
 
@@ -99,6 +96,12 @@ impl Game {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn clock_starts_at_0() {
+        let game = Game::default();
+        assert_eq!(game.clock, 0);
+    }
 
     #[test]
     fn new_game_starts_in_make_new_shape_state() {
@@ -123,21 +126,51 @@ mod tests {
     }
 
     #[test]
-    fn shape_drops_after_gravity_tick_elapses() {
+    fn take_input_with_clock_over_threshold_moves_to_drop_shape() {
+        let mut game = Game::default();
+        game.state = GameState::TakeInput;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, GRAVITY_TICK + 1);
+        assert_eq!(game.state, GameState::DropShape);
+    }
+
+    #[test]
+    fn take_input_with_clock_under_threshold_does_not_transition() {
+        let mut game = Game::default();
+        game.state = GameState::TakeInput;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, GRAVITY_TICK - 10);
+        assert_eq!(game.state, GameState::TakeInput);
+    }
+
+    #[test]
+    fn shape_drops_with_drop_shape() {
         let mut game = Game::default();
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         let y_1 = game.board.get_shape_pos().clone().unwrap().y;
-        game.tick(&inputs, GRAVITY_TICK);
+        game.drop_shape();
         let y_2 = game.board.get_shape_pos().clone().unwrap().y;
         assert!(y_1 < y_2)
     }
 
     #[test]
-    fn clock_resets_after_gravity_fires() {
+    fn shape_drops_when_clock_over_threshold() {
         let mut game = Game::default();
         let inputs: [Input; 0] = [];
-        game.tick(&inputs, GRAVITY_TICK + 1);
+        game.tick(&inputs, 1);
+        let y_1 = game.board.get_shape_pos().clone().unwrap().y;
+        game.tick(&inputs, GRAVITY_TICK + 10);
+        game.tick(&inputs, 16);
+        let y_2 = game.board.get_shape_pos().clone().unwrap().y;
+        assert!(y_1 < y_2)
+    }
+
+    #[test]
+    fn clock_resets_after_drop_shape() {
+        let mut game = Game::default();
+        game.clock = GRAVITY_TICK + 10;
+        game.drop_shape();
         assert_eq!(game.clock, 0);
     }
 
