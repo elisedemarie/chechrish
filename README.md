@@ -1,6 +1,6 @@
 # chechrish
 
-A Tetris clone in Rust built with `no_std`.
+A `no_std` Tetris clone in Rust.
 
 ## Crates
 
