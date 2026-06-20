@@ -4,8 +4,8 @@ extern crate alloc;
 mod board;
 mod game;
 mod input;
-mod shape;
 mod random;
+mod shape;
 
 pub use input::Input;
 

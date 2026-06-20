@@ -431,84 +431,144 @@ mod tests {
     #[test]
     fn rotating_s_east_gives_right_cells() {
         let shape = Shape::new(ShapeType::S, Orientation::East);
-        let expected = [Position::new(1,0), Position::new(1,1), Position::new(2,1), Position::new(2,2)];
+        let expected = [
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(2, 1),
+            Position::new(2, 2),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_s_south_gives_right_cells() {
         let shape = Shape::new(ShapeType::S, Orientation::South);
-        let expected = [Position::new(0,2), Position::new(1,1), Position::new(1,2), Position::new(2,1)];
+        let expected = [
+            Position::new(0, 2),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_s_west_gives_right_cells() {
         let shape = Shape::new(ShapeType::S, Orientation::West);
-        let expected = [Position::new(0,0), Position::new(0,1), Position::new(1,1), Position::new(1,2)];
+        let expected = [
+            Position::new(0, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(1, 2),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_t_east_gives_right_cells() {
         let shape = Shape::new(ShapeType::T, Orientation::East);
-        let expected = [Position::new(1,0), Position::new(1,1), Position::new(1,2), Position::new(2,1)];
+        let expected = [
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_t_south_gives_right_cells() {
         let shape = Shape::new(ShapeType::T, Orientation::South);
-        let expected = [Position::new(0,1), Position::new(1,1), Position::new(1,2), Position::new(2,1)];
+        let expected = [
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_t_west_gives_right_cells() {
         let shape = Shape::new(ShapeType::T, Orientation::West);
-        let expected = [Position::new(0,1), Position::new(1,0), Position::new(1,1), Position::new(1,2)];
+        let expected = [
+            Position::new(0, 1),
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_j_east_gives_right_cells() {
         let shape = Shape::new(ShapeType::J, Orientation::East);
-        let expected = [Position::new(0,0), Position::new(0,1), Position::new(1,1), Position::new(2,1)];
+        let expected = [
+            Position::new(0, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_j_south_gives_right_cells() {
         let shape = Shape::new(ShapeType::J, Orientation::South);
-        let expected = [Position::new(1,0), Position::new(1,1), Position::new(1,2), Position::new(2,0)];
+        let expected = [
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+            Position::new(2, 0),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_j_west_gives_right_cells() {
         let shape = Shape::new(ShapeType::J, Orientation::West);
-        let expected = [Position::new(0,1), Position::new(1,1), Position::new(2,1), Position::new(2,2)];
+        let expected = [
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(2, 1),
+            Position::new(2, 2),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_l_east_gives_right_cells() {
         let shape = Shape::new(ShapeType::L, Orientation::East);
-        let expected = [Position::new(0,1), Position::new(0,2), Position::new(1,1), Position::new(2,1)];
+        let expected = [
+            Position::new(0, 1),
+            Position::new(0, 2),
+            Position::new(1, 1),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_l_south_gives_right_cells() {
         let shape = Shape::new(ShapeType::L, Orientation::South);
-        let expected = [Position::new(0,0), Position::new(1,0), Position::new(1,1), Position::new(1,2)];
+        let expected = [
+            Position::new(0, 0),
+            Position::new(1, 0),
+            Position::new(1, 1),
+            Position::new(1, 2),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 
     #[test]
     fn rotating_l_west_gives_right_cells() {
         let shape = Shape::new(ShapeType::L, Orientation::West);
-        let expected = [Position::new(0,1), Position::new(1,1), Position::new(2,0), Position::new(2,1)];
+        let expected = [
+            Position::new(0, 1),
+            Position::new(1, 1),
+            Position::new(2, 0),
+            Position::new(2, 1),
+        ];
         assert_positions_equal(&shape.get_cells(), &expected);
     }
 }

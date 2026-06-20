@@ -1,5 +1,6 @@
 use crate::{
-    COLS, Input, ROWS, shape::{Orientation, Position, Shape, ShapeType}
+    COLS, Input, ROWS,
+    shape::{Orientation, Position, Shape, ShapeType},
 };
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]

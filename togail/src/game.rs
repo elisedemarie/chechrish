@@ -1,6 +1,10 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::{
     Frame, GRAVITY_TICK, Input,
-    board::{Board, DropOutcome, SpawnOutcome}, random::get_random_shape_type,
+    board::{Board, DropOutcome, SpawnOutcome},
+    random::get_random_shape_type,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,6 +15,7 @@ pub enum GameState {
     TakeInput,
     CheckRows,
     GameOver,
+    Pause,
 }
 
 pub struct Game {
@@ -18,6 +23,7 @@ pub struct Game {
     game_state: GameState,
     clock: u32,
     shape_state: u64,
+    input_buffer: Vec<Input>,
 }
 
 impl Default for Game {
@@ -27,15 +33,17 @@ impl Default for Game {
             game_state: GameState::MakeNewShape,
             clock: 0,
             shape_state: 1,
+            input_buffer: vec![],
         }
     }
 }
 
 impl Game {
     pub fn new(state: u64) -> Self {
-        let mut game = Self::default();
-        game.shape_state = state;
-        game
+        Game {
+            shape_state: state,
+            ..Default::default()
+        }
     }
 
     fn make_new_shape(&mut self) {
@@ -44,6 +52,7 @@ impl Game {
             SpawnOutcome::Spawned => GameState::TakeInput,
             SpawnOutcome::FullBoard => GameState::GameOver,
         };
+        self.input_buffer.retain(|it| matches!(it, Input::Pause));
     }
 
     fn drop_shape(&mut self) {
@@ -64,39 +73,54 @@ impl Game {
         self.game_state = GameState::MakeNewShape;
     }
 
-    fn take_input(&mut self, input: Option<Input>) {
+    fn take_input(&mut self) {
         if self.clock > GRAVITY_TICK {
             self.game_state = GameState::DropShape;
             return;
         }
-        let Some(input) = input else { return };
-        match input {
-            Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
-            Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
-            Input::HardDrop => {
-                self.board.hard_drop();
-                self.game_state = GameState::MergeShape;
+        for input in self.input_buffer.drain(..) {
+            match input {
+                Input::Pause => self.game_state = GameState::Pause,
+                Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
+                Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
+                Input::HardDrop => {
+                    self.board.hard_drop();
+                    self.game_state = GameState::MergeShape;
+                }
+                _ => (),
             }
-            _ => (),
         }
     }
 
-    fn step_state(&mut self, input: Option<Input>) {
+    fn pause(&mut self) {
+        for input in self.input_buffer.drain(..) {
+            self.game_state = match input {
+                Input::Pause => GameState::TakeInput,
+                _ => GameState::Pause,
+            }
+        }
+    }
+
+    fn game_over(&mut self) {
+        self.input_buffer = vec![];
+    }
+
+    fn step_state(&mut self) {
         match self.game_state {
             GameState::DropShape => self.drop_shape(),
             GameState::MakeNewShape => self.make_new_shape(),
             GameState::CheckRows => self.check_rows(),
-            GameState::TakeInput => self.take_input(input),
+            GameState::TakeInput => self.take_input(),
             GameState::MergeShape => self.merge_shape(),
-            GameState::GameOver => (),
+            GameState::Pause => self.pause(),
+            GameState::GameOver => self.game_over(),
         }
     }
 
     pub fn tick(&mut self, inputs: &[Input], delta_ms: u32) {
-        // HACK: Handle multiple inputs.
-        let input = inputs.first().copied();
+        self.input_buffer.extend_from_slice(inputs);
         self.clock += delta_ms;
-        self.step_state(input);
+        self.step_state();
     }
 
     pub fn get_frame(&self) -> Frame {
@@ -246,5 +270,155 @@ mod tests {
         let inputs: [Input; 0] = [];
         game.tick(&inputs, GRAVITY_TICK + 1);
         assert_eq!(game.game_state, GameState::GameOver)
+    }
+
+    #[test]
+    fn game_in_pause_stays_in_pause() {
+        let mut game = Game::default();
+        game.game_state = GameState::Pause;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 16);
+        assert_eq!(game.game_state, GameState::Pause)
+    }
+
+    #[test]
+    fn game_in_pause_goes_to_take_input_on_pause() {
+        let mut game = Game::default();
+        game.game_state = GameState::Pause;
+        let inputs: [Input; 1] = [Input::Pause];
+        game.tick(&inputs, 16);
+        assert_eq!(game.game_state, GameState::TakeInput)
+    }
+
+    #[test]
+    fn input_in_non_input_frame_applies_input_at_next_input_frame() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.make_new_shape();
+        game.game_state = GameState::DropShape;
+        // Pass input into game and move to TakeInput state
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, 16);
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        // Iter through to next TakeInput state.
+        while game.game_state != GameState::TakeInput {
+            let inputs: [Input; 0] = [];
+            game.tick(&inputs, 16);
+        }
+        // Pass no input on TakeInput state.
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 16);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0 - 1);
+    }
+
+    #[test]
+    fn input_in_non_input_frame_applies_multiple_input_at_next_input_frame() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.make_new_shape();
+        game.game_state = GameState::DropShape;
+        // Pass input into game and move to TakeInput state
+        let inputs: [Input; 2] = [Input::Left, Input::Left];
+        game.tick(&inputs, 16);
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        // Iter through to next TakeInput state.
+        while game.game_state != GameState::TakeInput {
+            let inputs: [Input; 0] = [];
+            game.tick(&inputs, 16);
+        }
+        // Pass no input on TakeInput state.
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 16);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0 - 2);
+    }
+
+    #[test]
+    fn move_on_gravity_tick_drops_gravity() {
+        let mut game = Game::default();
+        game.game_state = GameState::TakeInput;
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, GRAVITY_TICK + 1);
+        assert_eq!(game.game_state, GameState::DropShape)
+    }
+
+    #[test]
+    fn move_on_gravity_tick_does_not_move_shape() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.make_new_shape();
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        game.game_state = GameState::TakeInput;
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, GRAVITY_TICK + 1);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0);
+    }
+
+    #[test]
+    fn move_on_gravity_tick_moves_shape_after_next_frame() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.make_new_shape();
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        game.game_state = GameState::TakeInput;
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, GRAVITY_TICK + 1);
+        // Game state now DropShape
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 16);
+        // Game state now TakeInput
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 16);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0 - 1);
+    }
+
+    #[test]
+    fn move_on_take_input_moves_shape() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.make_new_shape();
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        game.game_state = GameState::TakeInput;
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, 1);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0 - 1);
+    }
+
+    #[test]
+    fn non_pause_from_before_make_shape_is_dropped() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.input_buffer = vec![
+            Input::Left,
+            Input::Left,
+            Input::Right,
+            Input::Pause,
+            Input::SoftDrop,
+        ];
+        game.game_state = GameState::MakeNewShape;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.input_buffer, vec![Input::Pause]);
+    }
+
+    #[test]
+    fn game_over_drains_input() {
+        // Arrange a shape and a non-input state.
+        let mut game = Game::default();
+        game.input_buffer = vec![
+            Input::Left,
+            Input::Left,
+            Input::Right,
+            Input::Pause,
+            Input::SoftDrop,
+        ];
+        game.game_state = GameState::GameOver;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.input_buffer, vec![]);
     }
 }

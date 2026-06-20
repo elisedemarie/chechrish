@@ -15,11 +15,9 @@ fn convert_state_to_shape_type(state: u64) -> ShapeType {
         4 => ShapeType::J,
         5 => ShapeType::L,
         6 => ShapeType::O,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
-
 }
-
 
 fn make_new_state(state: u64) -> u64 {
     // xorshift64
