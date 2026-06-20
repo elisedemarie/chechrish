@@ -158,16 +158,19 @@ impl Board {
         cells_to_render
     }
 
-    pub fn check_rows(&mut self) {
+    pub fn check_rows(&mut self) -> u32 {
         let mut row_idx = 0;
+        let mut cleared_rows = 0;
         while row_idx < ROWS {
             let row_sum = calc_row_sum(self.cells[row_idx]);
             if row_sum == COLS {
                 self.cells[row_idx] = [false; COLS];
                 self.cells[0..=row_idx].rotate_right(1);
+                cleared_rows += 1
             }
             row_idx += 1
         }
+        cleared_rows
     }
 }
 
@@ -238,6 +241,31 @@ mod tests {
         board.check_rows();
         let cells = board.cells;
         assert!(cells.iter().all(|col| col.iter().all(|cell| !*cell)))
+    }
+
+    #[test]
+    fn check_rows_returns_zero_when_no_row_is_full() {
+        let mut board = Board::default();
+        let cleared = board.check_rows();
+        assert_eq!(cleared, 0);
+    }
+
+    #[test]
+    fn check_rows_returns_one_for_a_single_cleared_row() {
+        let mut board = Board::default();
+        board.cells[ROWS - 1] = [true; COLS];
+        let cleared = board.check_rows();
+        assert_eq!(cleared, 1);
+    }
+
+    #[test]
+    fn check_rows_returns_count_for_multiple_cleared_rows() {
+        let mut board = Board::default();
+        board.cells[ROWS - 1] = [true; COLS];
+        board.cells[ROWS - 2] = [true; COLS];
+        board.cells[ROWS - 3] = [true; COLS];
+        let cleared = board.check_rows();
+        assert_eq!(cleared, 3);
     }
 
     #[test]

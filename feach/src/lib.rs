@@ -32,6 +32,14 @@ pub fn should_quit(inputs: &[Input]) -> bool {
     inputs.iter().any(|i| matches!(i, Input::Quit))
 }
 
+pub fn parse_debug_level(args: &[String]) -> u32 {
+    args.iter()
+        .position(|a| a == "--level")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
 const DAS_MS: u32 = 167;
 const ARR_MS: u32 = 33;
 
@@ -61,6 +69,12 @@ fn input_index(input: Input) -> usize {
 
 pub struct InputHandler {
     held_ms: [u32; 8],
+}
+
+impl Default for InputHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InputHandler {
@@ -148,6 +162,30 @@ pub fn map_key(key: Key) -> Option<Input> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn no_level_flag_defaults_to_zero() {
+        assert_eq!(parse_debug_level(&args(&[])), 0);
+    }
+
+    #[test]
+    fn level_flag_parses_value() {
+        assert_eq!(parse_debug_level(&args(&["--level", "10"])), 10);
+    }
+
+    #[test]
+    fn level_flag_with_missing_value_defaults_to_zero() {
+        assert_eq!(parse_debug_level(&args(&["--level"])), 0);
+    }
+
+    #[test]
+    fn level_flag_with_non_numeric_value_defaults_to_zero() {
+        assert_eq!(parse_debug_level(&args(&["--level", "abc"])), 0);
+    }
 
     fn empty_board() -> [[bool; COLS]; ROWS] {
         [[false; COLS]; ROWS]

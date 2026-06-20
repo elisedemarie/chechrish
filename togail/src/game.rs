@@ -7,6 +7,28 @@ use crate::{
     random::get_random_shape_type,
 };
 
+const ROWS_PER_LEVEL: u32 = 10;
+
+fn get_gravity(level: u32) -> u32 {
+    let mut tick = GRAVITY_TICK;
+    for _ in 0..level {
+        tick = tick * 85 / 100;
+    }
+    tick
+}
+
+fn get_score(level: u32, cleared_rows: u32) -> u32 {
+    let base_score = match cleared_rows {
+        0 => 0,
+        1 => 100,
+        2 => 300,
+        3 => 500,
+        4 => 800,
+        _ => unreachable!(),
+    };
+    base_score * (level + 1)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
     MakeNewShape,
@@ -15,6 +37,7 @@ pub enum GameState {
     TakeInput,
     CheckRows,
     GameOver,
+    CheckLevel,
     Pause,
 }
 
@@ -24,6 +47,10 @@ pub struct Game {
     clock: u32,
     shape_state: u64,
     input_buffer: Vec<Input>,
+    level: u32,
+    gravity_tick: u32,
+    cleared_rows: u32,
+    score: u32,
 }
 
 impl Default for Game {
@@ -34,6 +61,10 @@ impl Default for Game {
             clock: 0,
             shape_state: 1,
             input_buffer: vec![],
+            level: 0,
+            gravity_tick: GRAVITY_TICK,
+            cleared_rows: 0,
+            score: 0,
         }
     }
 }
@@ -45,6 +76,17 @@ impl Game {
             ..Default::default()
         }
     }
+
+    pub fn new_at_level(state: u64, level: u32) -> Self {
+        Game {
+            shape_state: state,
+            level: level,
+            cleared_rows: ROWS_PER_LEVEL * level,
+            gravity_tick: get_gravity(level),
+            ..Default::default()
+        }
+    }
+
 
     fn make_new_shape(&mut self) {
         let shape_type = get_random_shape_type(&mut self.shape_state);
@@ -69,15 +111,22 @@ impl Game {
     }
 
     fn check_rows(&mut self) {
-        self.board.check_rows();
+        let cleared_rows = self.board.check_rows();
+        self.score += get_score(self.level, cleared_rows);
+        self.cleared_rows += cleared_rows;
+        self.game_state = GameState::CheckLevel;
+    }
+
+    fn check_level(&mut self) {
+        let new_level = self.cleared_rows / ROWS_PER_LEVEL;
+        if new_level != self.level {
+            self.level = new_level;
+            self.gravity_tick = get_gravity(self.level);
+        }
         self.game_state = GameState::MakeNewShape;
     }
 
     fn take_input(&mut self) {
-        if self.clock > GRAVITY_TICK {
-            self.game_state = GameState::DropShape;
-            return;
-        }
         for input in self.input_buffer.drain(..) {
             match input {
                 Input::Pause => self.game_state = GameState::Pause,
@@ -89,6 +138,10 @@ impl Game {
                 }
                 _ => (),
             }
+        }
+        if self.game_state == GameState::TakeInput 
+            && self.clock > self.gravity_tick {
+            self.game_state = GameState::DropShape;
         }
     }
 
@@ -114,6 +167,7 @@ impl Game {
             GameState::MergeShape => self.merge_shape(),
             GameState::Pause => self.pause(),
             GameState::GameOver => self.game_over(),
+            GameState::CheckLevel => self.check_level(),
         }
     }
 
@@ -127,8 +181,8 @@ impl Game {
         let buffer = self.board.render_cells();
         Frame {
             board: buffer,
-            score: 0,
-            level: 1,
+            score: self.score,
+            level: self.level,
         }
     }
 }
@@ -247,12 +301,145 @@ mod tests {
     }
 
     #[test]
-    fn check_rows_transitions_to_make_new_shape() {
+    fn check_rows_transitions_to_check_level() {
         let mut game = Game::default();
         game.game_state = GameState::CheckRows;
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
+        assert_eq!(game.game_state, GameState::CheckLevel);
+    }
+
+    #[test]
+    fn check_level_transitions_to_make_new_shape() {
+        let mut game = Game::default();
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
         assert_eq!(game.game_state, GameState::MakeNewShape);
+    }
+
+    #[test]
+    fn level_stays_zero_below_threshold() {
+        let mut game = Game::default();
+        game.cleared_rows = ROWS_PER_LEVEL - 1;
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.level, 0);
+    }
+
+    #[test]
+    fn level_increments_at_threshold() {
+        let mut game = Game::default();
+        game.cleared_rows = ROWS_PER_LEVEL;
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.level, 1);
+    }
+
+    #[test]
+    fn level_jumps_multiple_thresholds_in_one_clear() {
+        let mut game = Game::default();
+        game.cleared_rows = ROWS_PER_LEVEL * 2;
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.level, 2);
+    }
+
+    #[test]
+    fn gravity_tick_updates_when_level_changes() {
+        let mut game = Game::default();
+        let tick_0 = game.gravity_tick;
+        game.cleared_rows = ROWS_PER_LEVEL;
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert!(game.gravity_tick < tick_0);
+    }
+
+    #[test]
+    fn gravity_tick_unchanged_when_level_unchanged() {
+        let mut game = Game::default();
+        let tick_0 = game.gravity_tick;
+        game.cleared_rows = ROWS_PER_LEVEL - 1;
+        game.game_state = GameState::CheckLevel;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.gravity_tick, tick_0);
+    }
+
+    #[test]
+    fn get_gravity_at_level_zero_is_base_gravity_tick() {
+        let game = Game::default();
+        assert_eq!(get_gravity(game.level), GRAVITY_TICK);
+    }
+
+    #[test]
+    fn get_gravity_decreases_as_level_increases() {
+        let mut game = Game::default();
+        game.level = 1;
+        let tick_1 = get_gravity(game.level);
+        game.level = 2;
+        let tick_2 = get_gravity(game.level);
+        assert!(tick_2 < tick_1);
+        assert!(tick_1 < GRAVITY_TICK);
+    }
+
+    #[test]
+    fn get_frame_reports_current_level() {
+        let mut game = Game::default();
+        game.level = 3;
+        assert_eq!(game.get_frame().level, 3);
+    }
+
+    #[test]
+    fn get_score_for_no_cleared_rows_is_zero() {
+        assert_eq!(get_score(0, 0), 0);
+    }
+
+    #[test]
+    fn get_score_for_single_at_level_zero() {
+        assert_eq!(get_score(0, 1), 100);
+    }
+
+    #[test]
+    fn get_score_for_double_at_level_zero() {
+        assert_eq!(get_score(0, 2), 300);
+    }
+
+    #[test]
+    fn get_score_for_triple_at_level_zero() {
+        assert_eq!(get_score(0, 3), 500);
+    }
+
+    #[test]
+    fn get_score_for_tetris_at_level_zero() {
+        assert_eq!(get_score(0, 4), 800);
+    }
+
+    #[test]
+    fn get_score_scales_with_level() {
+        assert_eq!(get_score(1, 1), 200);
+        assert_eq!(get_score(2, 1), 300);
+    }
+
+    #[test]
+    fn merging_with_no_full_rows_does_not_change_score() {
+        let mut game = Game::default();
+        game.tick(&[], 1); // spawn shape → TakeInput
+        game.game_state = GameState::CheckRows;
+        let inputs: [Input; 0] = [];
+        game.tick(&inputs, 1);
+        assert_eq!(game.score, 0);
+    }
+
+    #[test]
+    fn get_frame_reports_current_score() {
+        let mut game = Game::default();
+        game.score = 4200;
+        assert_eq!(game.get_frame().score, 4200);
     }
 
     #[test]
@@ -260,6 +447,16 @@ mod tests {
         let mut game = Game::default();
         game.tick(&[], 1); // spawn shape → TakeInput
         game.tick(&[Input::HardDrop], 1);
+        assert_eq!(game.game_state, GameState::MergeShape);
+    }
+
+    #[test]
+    fn hard_drop_wins_over_gravity_due_in_the_same_tick() {
+        let mut game = Game::default();
+        game.tick(&[], 1); // spawn shape → TakeInput
+        game.game_state = GameState::TakeInput;
+        let inputs = [Input::HardDrop];
+        game.tick(&inputs, GRAVITY_TICK + 1);
         assert_eq!(game.game_state, GameState::MergeShape);
     }
 
@@ -344,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn move_on_gravity_tick_does_not_move_shape() {
+    fn move_on_gravity_tick_does_move_shape() {
         // Arrange a shape and a non-input state.
         let mut game = Game::default();
         game.make_new_shape();
@@ -353,7 +550,7 @@ mod tests {
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
         let x_1 = game.board.get_shape_pos().unwrap().x;
-        assert_eq!(x_1, x_0);
+        assert_eq!(x_1, x_0-1);
     }
 
     #[test]
@@ -386,6 +583,26 @@ mod tests {
         game.tick(&inputs, 1);
         let x_1 = game.board.get_shape_pos().unwrap().x;
         assert_eq!(x_1, x_0 - 1);
+    }
+
+    #[test]
+    fn input_still_applies_at_extremely_high_level_where_gravity_is_near_instant() {
+        let mut game = Game::new_at_level(1, 100);
+        game.tick(&[], 1); // spawn shape, enters TakeInput
+        let x_0 = game.board.get_shape_pos().unwrap().x;
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, 16);
+        let x_1 = game.board.get_shape_pos().unwrap().x;
+        assert_eq!(x_1, x_0 - 1);
+    }
+
+    #[test]
+    fn gravity_still_fires_at_extremely_high_level_alongside_input() {
+        let mut game = Game::new_at_level(1, 100);
+        game.tick(&[], 1); // spawn shape, enters TakeInput
+        let inputs: [Input; 1] = [Input::Left];
+        game.tick(&inputs, 16);
+        assert_eq!(game.game_state, GameState::DropShape);
     }
 
     #[test]
