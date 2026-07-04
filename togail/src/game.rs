@@ -1,20 +1,15 @@
-use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::{
     Frame, GRAVITY_TICK, Input,
-    board::{Board, DropOutcome, SpawnOutcome},
+    board::{Board, Move, MoveOutcome, Rotation, SpawnOutcome},
     random::get_random_shape_type,
 };
 
 const ROWS_PER_LEVEL: u32 = 10;
 
 fn get_gravity(level: u32) -> u32 {
-    let mut tick = GRAVITY_TICK;
-    for _ in 0..level {
-        tick = tick * 85 / 100;
-    }
-    tick
+    (0..level).fold(GRAVITY_TICK, |tick, _| tick * 85 / 100)
 }
 
 fn get_score(level: u32, cleared_rows: u32) -> u32 {
@@ -60,7 +55,7 @@ impl Default for Game {
             game_state: GameState::MakeNewShape,
             clock: 0,
             shape_state: 1,
-            input_buffer: vec![],
+            input_buffer: Vec::new(),
             level: 0,
             gravity_tick: GRAVITY_TICK,
             cleared_rows: 0,
@@ -77,89 +72,95 @@ impl Game {
         }
     }
 
-    pub fn new_at_level(state: u64, level: u32) -> Self {
+    pub fn new_at_level(shape_state: u64, level: u32) -> Self {
         Game {
-            shape_state: state,
-            level: level,
+            shape_state,
+            level,
             cleared_rows: ROWS_PER_LEVEL * level,
             gravity_tick: get_gravity(level),
             ..Default::default()
         }
     }
 
-
-    fn make_new_shape(&mut self) {
+    fn make_new_shape(&mut self) -> GameState {
         let shape_type = get_random_shape_type(&mut self.shape_state);
-        self.game_state = match self.board.add_new_shape(shape_type) {
+        self.input_buffer.retain(|it| matches!(it, Input::Pause));
+        match self.board.add_new_shape(shape_type) {
             SpawnOutcome::Spawned => GameState::TakeInput,
             SpawnOutcome::FullBoard => GameState::GameOver,
-        };
-        self.input_buffer.retain(|it| matches!(it, Input::Pause));
-    }
-
-    fn drop_shape(&mut self) {
-        self.clock = 0;
-        self.game_state = match self.board.drop_shape() {
-            DropOutcome::Landed => GameState::MergeShape,
-            DropOutcome::Dropped => GameState::TakeInput,
         }
     }
 
-    fn merge_shape(&mut self) {
-        self.board.merge_shape();
-        self.game_state = GameState::CheckRows;
+    fn drop_shape(&mut self) -> GameState {
+        self.clock = 0;
+        match self.board.move_shape(Move::Drop) {
+            MoveOutcome::Failed => GameState::MergeShape,
+            MoveOutcome::Moved => GameState::TakeInput,
+        }
     }
 
-    fn check_rows(&mut self) {
+    fn merge_shape(&mut self) -> GameState {
+        self.board.merge_shape();
+        GameState::CheckRows
+    }
+
+    fn check_rows(&mut self) -> GameState {
         let cleared_rows = self.board.check_rows();
         self.score += get_score(self.level, cleared_rows);
         self.cleared_rows += cleared_rows;
-        self.game_state = GameState::CheckLevel;
+        GameState::CheckLevel
     }
 
-    fn check_level(&mut self) {
+    fn check_level(&mut self) -> GameState {
         let new_level = self.cleared_rows / ROWS_PER_LEVEL;
         if new_level != self.level {
             self.level = new_level;
             self.gravity_tick = get_gravity(self.level);
         }
-        self.game_state = GameState::MakeNewShape;
+        GameState::MakeNewShape
     }
 
-    fn take_input(&mut self) {
+    fn take_input(&mut self) -> GameState {
         for input in self.input_buffer.drain(..) {
             match input {
-                Input::Pause => self.game_state = GameState::Pause,
-                Input::Left | Input::Right | Input::SoftDrop => self.board.move_shape(input),
-                Input::RotateCw | Input::RotateCcw => self.board.rotate_shape(input),
+                Input::Pause => return GameState::Pause,
+                Input::Left => self.board.move_shape(Move::Left),
+                Input::Right => self.board.move_shape(Move::Right),
+                Input::SoftDrop => self.board.move_shape(Move::Drop),
+                Input::RotateCcw => self.board.rotate_shape(Rotation::AntiClockwise),
+                Input::RotateCw => self.board.rotate_shape(Rotation::Clockwise),
                 Input::HardDrop => {
                     self.board.hard_drop();
-                    self.game_state = GameState::MergeShape;
+                    return GameState::MergeShape;
                 }
-                _ => (),
-            }
+                Input::Quit => {
+                    unreachable!("Quit should not have been passable through to game state engine.")
+                }
+            };
         }
-        if self.game_state == GameState::TakeInput 
-            && self.clock > self.gravity_tick {
-            self.game_state = GameState::DropShape;
+        if self.clock > self.gravity_tick {
+            GameState::DropShape
+        } else {
+            GameState::TakeInput
         }
     }
 
-    fn pause(&mut self) {
+    fn pause(&mut self) -> GameState {
         for input in self.input_buffer.drain(..) {
-            self.game_state = match input {
-                Input::Pause => GameState::TakeInput,
-                _ => GameState::Pause,
+            if input == Input::Pause {
+                return GameState::TakeInput;
             }
         }
+        GameState::Pause
     }
 
-    fn game_over(&mut self) {
-        self.input_buffer = vec![];
+    fn game_over(&mut self) -> GameState {
+        self.input_buffer.clear();
+        GameState::GameOver
     }
 
     fn step_state(&mut self) {
-        match self.game_state {
+        self.game_state = match self.game_state {
             GameState::DropShape => self.drop_shape(),
             GameState::MakeNewShape => self.make_new_shape(),
             GameState::CheckRows => self.check_rows(),
@@ -189,6 +190,8 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+
+    use alloc::vec;
 
     use super::*;
 
@@ -534,6 +537,7 @@ mod tests {
     #[test]
     fn move_on_gravity_tick_drops_gravity() {
         let mut game = Game::default();
+        game.tick(&[], 1); // spawn shape → TakeInput
         game.game_state = GameState::TakeInput;
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
@@ -550,7 +554,7 @@ mod tests {
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
         let x_1 = game.board.get_shape_pos().unwrap().x;
-        assert_eq!(x_1, x_0-1);
+        assert_eq!(x_1, x_0 - 1);
     }
 
     #[test]

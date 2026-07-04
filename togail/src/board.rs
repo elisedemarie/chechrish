@@ -1,12 +1,25 @@
 use crate::{
-    COLS, Input, ROWS,
+    COLS, ROWS,
     shape::{Orientation, Position, Shape, ShapeType},
 };
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub enum DropOutcome {
-    Dropped,
-    Landed,
+pub enum MoveOutcome {
+    Moved,
+    Failed,
+}
+
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub enum Move {
+    Drop,
+    Left,
+    Right,
+}
+
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub enum Rotation {
+    Clockwise,
+    AntiClockwise,
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -46,7 +59,7 @@ impl Board {
         let shape = Shape::new(shape_type, Orientation::North);
         let spawn_col = (COLS - shape.shape_type.shape_size()) / 2;
         let position = Position::new(spawn_col as isize, 0);
-        let shape_cells = shape.get_cells().map(|it| it + position);
+        let shape_cells = shape.cells_at(position);
         if self.is_valid_placement(&shape_cells) {
             self.shape = Some(shape);
             self.shape_position = Some(position);
@@ -54,29 +67,6 @@ impl Board {
         } else {
             SpawnOutcome::FullBoard
         }
-    }
-
-    pub fn move_shape(&mut self, input: Input) {
-        let vec = match input {
-            Input::Left => Position::new(-1, 0),
-            Input::Right => Position::new(1, 0),
-            Input::SoftDrop => Position::new(0, 1),
-            _ => return,
-        };
-        let Some(pos) = self.shape_position else {
-            return;
-        };
-        let Some(shape) = &mut self.shape else { return };
-        let new_pos = pos + vec;
-        let shape_cells = shape.get_cells();
-        let new_cells = shape_cells.map(|pos| pos + new_pos);
-        if self.is_valid_placement(&new_cells) {
-            self.shape_position = Some(new_pos)
-        }
-    }
-
-    pub fn hard_drop(&mut self) {
-        while self.drop_shape() == DropOutcome::Dropped {}
     }
 
     fn is_valid_placement(&self, positions: &[Position]) -> bool {
@@ -93,38 +83,46 @@ impl Board {
         true
     }
 
-    pub fn drop_shape(&mut self) -> DropOutcome {
-        let shape_position = self
+    pub fn move_shape(&mut self, input_move: Move) -> MoveOutcome {
+        let vec = match input_move {
+            Move::Left => Position::new(-1, 0),
+            Move::Right => Position::new(1, 0),
+            Move::Drop => Position::new(0, 1),
+        };
+        let pos = self
             .shape_position
-            .expect("There should be a shape position here!");
-        let shape = self.shape.expect("There should be a shape here!");
-        let mut new_pos = shape_position;
-        new_pos.y += 1;
-        let shape_cells = shape.get_cells();
-        let new_cells = shape_cells.map(|pos| pos + new_pos);
+            .expect("move_shape called with no shape position.");
+        let shape = self.shape.expect("move_shape called with no shape.");
+        let new_pos = pos + vec;
+        let new_cells = shape.cells_at(new_pos);
         if self.is_valid_placement(&new_cells) {
             self.shape_position = Some(new_pos);
-            DropOutcome::Dropped
+            MoveOutcome::Moved
         } else {
-            DropOutcome::Landed
+            MoveOutcome::Failed
         }
     }
 
-    pub fn rotate_shape(&mut self, input: Input) {
-        let Some(pos) = self.shape_position else {
-            return;
-        };
-        let Some(shape) = self.shape else { return };
+    pub fn hard_drop(&mut self) {
+        while self.move_shape(Move::Drop) == MoveOutcome::Moved {}
+    }
+
+    pub fn rotate_shape(&mut self, input_rotation: Rotation) -> MoveOutcome {
+        let pos = self
+            .shape_position
+            .expect("move_shape called with no shape position.");
+        let shape = self.shape.expect("move_shape called with no shape.");
         let mut new_shape = shape;
-        match input {
-            Input::RotateCw => new_shape.rotate_clockwise(),
-            Input::RotateCcw => new_shape.rotate_anti_clockwise(),
-            _ => return,
+        match input_rotation {
+            Rotation::Clockwise => new_shape.rotate_clockwise(),
+            Rotation::AntiClockwise => new_shape.rotate_anti_clockwise(),
         };
-        let shape_cells = new_shape.get_cells();
-        let new_cells = shape_cells.map(|shape_pos| shape_pos + pos);
+        let new_cells = new_shape.cells_at(pos);
         if self.is_valid_placement(&new_cells) {
             self.shape = Some(new_shape);
+            MoveOutcome::Moved
+        } else {
+            MoveOutcome::Failed
         }
     }
 
@@ -133,7 +131,7 @@ impl Board {
         let Some(pos) = self.shape_position else {
             return;
         };
-        let cells = shape.get_cells().map(|shape_pos| shape_pos + pos);
+        let cells = shape.cells_at(pos);
         for cell in cells {
             self.set_cell(cell.y as usize, cell.x as usize, true);
         }
@@ -159,16 +157,14 @@ impl Board {
     }
 
     pub fn check_rows(&mut self) -> u32 {
-        let mut row_idx = 0;
         let mut cleared_rows = 0;
-        while row_idx < ROWS {
+        for row_idx in 0..ROWS {
             let row_sum = calc_row_sum(self.cells[row_idx]);
             if row_sum == COLS {
                 self.cells[row_idx] = [false; COLS];
                 self.cells[0..=row_idx].rotate_right(1);
                 cleared_rows += 1
             }
-            row_idx += 1
         }
         cleared_rows
     }
@@ -212,7 +208,7 @@ mod tests {
         let mut board = Board::default();
         board.add_new_shape(ShapeType::Z);
         let y_0 = board.shape_position.unwrap().y;
-        board.drop_shape();
+        board.move_shape(Move::Drop);
         let y_1 = board.shape_position.unwrap().y;
         assert_eq!(y_1, y_0 + 1);
     }
@@ -311,10 +307,9 @@ mod tests {
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let x_0 = 2;
         let pos_0 = Position::new(x_0, 0);
-        let input = Input::Left;
         board.shape = Some(shape);
         board.shape_position = Some(pos_0);
-        board.move_shape(input);
+        board.move_shape(Move::Left);
         let x_1 = board.shape_position.unwrap().x;
         assert_eq!(x_1, x_0 - 1);
     }
@@ -325,10 +320,9 @@ mod tests {
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let x_0 = 2;
         let pos_0 = Position::new(x_0, 0);
-        let input = Input::Right;
         board.shape = Some(shape);
         board.shape_position = Some(pos_0);
-        board.move_shape(input);
+        board.move_shape(Move::Right);
         let x_1 = board.shape_position.unwrap().x;
         assert_eq!(x_1, x_0 + 1);
     }
@@ -339,21 +333,11 @@ mod tests {
         let shape = Shape::new(ShapeType::Z, Orientation::North);
         let y_0 = 0;
         let pos_0 = Position::new(2, y_0);
-        let input = Input::SoftDrop;
         board.shape = Some(shape);
         board.shape_position = Some(pos_0);
-        board.move_shape(input);
+        board.move_shape(Move::Drop);
         let y_1 = board.shape_position.unwrap().y;
         assert_eq!(y_1, y_0 + 1);
-    }
-
-    #[test]
-    fn transform_with_no_shape_does_nothing() {
-        let mut board = Board::default();
-        let input = Input::Left;
-        board.move_shape(input);
-        let cells = board.cells;
-        assert!(cells.iter().all(|col| col.iter().all(|cell| !*cell)))
     }
 
     #[test]
@@ -363,8 +347,8 @@ mod tests {
         let shape_pos = Position::new(0, ROWS as isize - 2);
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
-        let res = board.drop_shape();
-        assert_eq!(res, DropOutcome::Landed)
+        let res = board.move_shape(Move::Drop);
+        assert_eq!(res, MoveOutcome::Failed)
     }
 
     #[test]
@@ -374,8 +358,8 @@ mod tests {
         let shape_pos = Position::new(0, 0);
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
-        let res = board.drop_shape();
-        assert_eq!(res, DropOutcome::Dropped)
+        let res = board.move_shape(Move::Drop);
+        assert_eq!(res, MoveOutcome::Moved)
     }
 
     #[test]
@@ -386,8 +370,8 @@ mod tests {
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
         board.cells[2][1] = true;
-        let res = board.drop_shape();
-        assert_eq!(res, DropOutcome::Landed)
+        let res = board.move_shape(Move::Drop);
+        assert_eq!(res, MoveOutcome::Failed)
     }
 
     #[test]
@@ -398,8 +382,8 @@ mod tests {
         board.shape = Some(shape);
         board.shape_position = Some(shape_pos);
         board.cells[2][0] = true;
-        let res = board.drop_shape();
-        assert_eq!(res, DropOutcome::Dropped)
+        let res = board.move_shape(Move::Drop);
+        assert_eq!(res, MoveOutcome::Moved)
     }
 
     #[test]
@@ -409,7 +393,7 @@ mod tests {
         board.shape = Some(shape);
         board.shape_position = Some(Position::new(0, 0));
         board.hard_drop();
-        assert_eq!(board.drop_shape(), DropOutcome::Landed);
+        assert_eq!(board.move_shape(Move::Drop), MoveOutcome::Failed);
     }
 
     #[test]
@@ -455,5 +439,36 @@ mod tests {
         board.cells = [[true; COLS]; ROWS];
         let res = board.add_new_shape(ShapeType::Z);
         assert_eq!(res, SpawnOutcome::FullBoard)
+    }
+
+    #[test]
+    fn rotate_i_on_wall_rotates() {
+        let mut board = Board::default();
+        board.add_new_shape(ShapeType::I);
+        board.shape_position = Some(Position::new(-2, 0));
+        board.rotate_shape(Rotation::Clockwise);
+        let obs_cells = board.render_cells();
+        let mut exp_cells = [[false; COLS]; ROWS];
+        exp_cells[2][0] = true;
+        exp_cells[2][1] = true;
+        exp_cells[2][2] = true;
+        exp_cells[2][3] = true;
+        assert_eq!(obs_cells, exp_cells);
+    }
+
+    #[test]
+    fn rotate_east_z_on_wall_rotates() {
+        let mut board = Board::default();
+        let shape = Shape::new(ShapeType::Z, Orientation::East);
+        board.shape = Some(shape);
+        board.shape_position = Some(Position::new(-1, 0));
+        board.rotate_shape(Rotation::AntiClockwise);
+        let obs_cells = board.render_cells();
+        let mut exp_cells = [[false; COLS]; ROWS];
+        exp_cells[0][1] = true;
+        exp_cells[1][1] = true;
+        exp_cells[1][2] = true;
+        exp_cells[2][2] = true;
+        assert_eq!(obs_cells, exp_cells);
     }
 }

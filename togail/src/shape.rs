@@ -22,6 +22,8 @@ impl Add for Position {
     }
 }
 
+type ShapeCells = [Position; 4];
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ShapeType {
     I,
@@ -34,7 +36,7 @@ pub enum ShapeType {
 }
 
 impl ShapeType {
-    pub fn shape_cells(&self) -> [Position; 4] {
+    pub fn shape_cells(&self) -> ShapeCells {
         match self {
             Self::I => [
                 Position { x: 2, y: 0 },
@@ -112,7 +114,7 @@ impl Shape {
         }
     }
 
-    pub fn get_cells(&self) -> [Position; 4] {
+    pub fn get_cells(&self) -> ShapeCells {
         let shape_cells = self.shape_type.shape_cells();
         let shape_size = self.shape_type.shape_size();
         match self.orientation {
@@ -124,6 +126,10 @@ impl Shape {
                 shape_size,
             ),
         }
+    }
+
+    pub fn cells_at(&self, pos: Position) -> ShapeCells {
+        self.get_cells().map(|cell| cell + pos)
     }
 
     pub fn rotate_clockwise(&mut self) {
@@ -145,7 +151,7 @@ impl Shape {
     }
 }
 
-fn rotate_shape(positions: [Position; 4], shape_size: usize) -> [Position; 4] {
+fn rotate_shape(positions: ShapeCells, shape_size: usize) -> ShapeCells {
     positions.map(|pos: Position| Position {
         x: -pos.y - 1 + shape_size as isize,
         y: pos.x,
