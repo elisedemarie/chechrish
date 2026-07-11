@@ -117,15 +117,13 @@ impl Shape {
     pub fn get_cells(&self) -> ShapeCells {
         let shape_cells = self.shape_type.shape_cells();
         let shape_size = self.shape_type.shape_size();
-        match self.orientation {
-            Orientation::North => shape_cells,
-            Orientation::East => rotate_shape(shape_cells, shape_size),
-            Orientation::South => rotate_shape(rotate_shape(shape_cells, shape_size), shape_size),
-            Orientation::West => rotate_shape(
-                rotate_shape(rotate_shape(shape_cells, shape_size), shape_size),
-                shape_size,
-            ),
-        }
+        let rotations = match self.orientation {
+            Orientation::North => 0,
+            Orientation::East => 1,
+            Orientation::South => 2,
+            Orientation::West => 3,
+        };
+        (0..rotations).fold(shape_cells, |cells, _| rotate_shape(cells, shape_size))
     }
 
     pub fn cells_at(&self, pos: Position) -> ShapeCells {

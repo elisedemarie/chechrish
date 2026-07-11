@@ -71,17 +71,11 @@ impl Board {
     }
 
     fn is_valid_placement(&self, positions: &[Position]) -> bool {
-        for pos in positions {
-            if pos.x < 0
-                || pos.x as usize >= COLS
-                || pos.y < 0
-                || pos.y as usize >= ROWS
-                || self.cells[pos.y as usize][pos.x as usize]
-            {
-                return false;
-            }
-        }
-        true
+        positions.iter().all(|pos| {
+            (0..COLS as isize).contains(&pos.x)
+                && (0..ROWS as isize).contains(&pos.y)
+                && !self.cells[pos.y as usize][pos.x as usize]
+        })
     }
 
     fn update_ghost_position(&mut self, new_pos: Position) {
@@ -130,6 +124,7 @@ impl Board {
             .shape_position
             .expect("hard_drop was called without there being a shape position.");
         self.shape_position = Some(self.hard_drop_from_pos(pos));
+        self.ghost_position = None;
     }
 
     fn hard_drop_from_pos(&self, mut pos: Position) -> Position {
@@ -149,8 +144,9 @@ impl Board {
             Rotation::Clockwise => new_shape.rotate_clockwise(),
             Rotation::AntiClockwise => new_shape.rotate_anti_clockwise(),
         };
-        let max_offset = shape.shape_type.shape_size();
-        let step_sequence = once(0).chain((1..=max_offset).flat_map(|i| [-(i as isize), i as isize]));
+        let max_offset = shape.shape_type.shape_size() - 2;
+        let step_sequence =
+            once(0).chain((1..=max_offset).flat_map(|i| [-(i as isize), i as isize]));
         for step in step_sequence {
             let mut new_pos = pos;
             new_pos.x += step;
@@ -159,7 +155,7 @@ impl Board {
                 self.shape = Some(new_shape);
                 self.shape_position = Some(new_pos);
                 self.update_ghost_position(new_pos);
-                return 
+                return;
             };
         }
     }
@@ -479,8 +475,10 @@ mod tests {
 
     #[test]
     fn full_board_does_not_make_shape() {
-        let mut board = Board::default();
-        board.cells = [[true; COLS]; ROWS];
+        let mut board = Board {
+            cells: [[true; COLS]; ROWS],
+            ..Default::default()
+        };
         board.add_new_shape(ShapeType::Z);
         assert!(board.shape.is_none());
         assert!(board.shape_position.is_none());
@@ -488,8 +486,10 @@ mod tests {
 
     #[test]
     fn full_board_returns_full_board_on_make_new_shape() {
-        let mut board = Board::default();
-        board.cells = [[true; COLS]; ROWS];
+        let mut board = Board {
+            cells: [[true; COLS]; ROWS],
+            ..Default::default()
+        };
         let res = board.add_new_shape(ShapeType::Z);
         assert_eq!(res, SpawnOutcome::FullBoard)
     }

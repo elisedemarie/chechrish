@@ -304,7 +304,12 @@ mod tests {
     // overlay_ghost tests
 
     fn ghost_at(col: usize, row: usize) -> [(usize, usize); 4] {
-        [(col, row), (col + 1, row), (col, row + 1), (col + 1, row + 1)]
+        [
+            (col, row),
+            (col + 1, row),
+            (col, row + 1),
+            (col + 1, row + 1),
+        ]
     }
 
     #[test]

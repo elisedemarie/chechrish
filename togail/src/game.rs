@@ -38,7 +38,7 @@ pub enum GameState {
 
 pub struct Game {
     board: Board,
-    game_state: GameState,
+    state: GameState,
     clock: u32,
     shape_state: u64,
     input_buffer: Vec<Input>,
@@ -52,7 +52,7 @@ impl Default for Game {
     fn default() -> Self {
         Self {
             board: Board::default(),
-            game_state: GameState::MakeNewShape,
+            state: GameState::MakeNewShape,
             clock: 0,
             shape_state: 1,
             input_buffer: Vec::new(),
@@ -160,7 +160,7 @@ impl Game {
     }
 
     fn step_state(&mut self) {
-        self.game_state = match self.game_state {
+        self.state = match self.state {
             GameState::DropShape => self.drop_shape(),
             GameState::MakeNewShape => self.make_new_shape(),
             GameState::CheckRows => self.check_rows(),
@@ -202,13 +202,13 @@ mod tests {
         let inputs = [];
         game.tick(&inputs, 1); // spawns shape, enters TakeInput
         game.tick(&inputs, 1); // should stay in TakeInput
-        assert_eq!(game.game_state, GameState::TakeInput);
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
     fn new_game_starts_in_make_new_shape_state() {
         let game = Game::default();
-        assert_eq!(game.game_state, GameState::MakeNewShape);
+        assert_eq!(game.state, GameState::MakeNewShape);
     }
 
     #[test]
@@ -229,20 +229,24 @@ mod tests {
 
     #[test]
     fn take_input_with_clock_over_threshold_moves_to_drop_shape() {
-        let mut game = Game::default();
-        game.game_state = GameState::TakeInput;
+        let mut game = Game {
+            state: GameState::TakeInput,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, GRAVITY_TICK + 1);
-        assert_eq!(game.game_state, GameState::DropShape);
+        assert_eq!(game.state, GameState::DropShape);
     }
 
     #[test]
     fn take_input_with_clock_under_threshold_does_not_transition() {
-        let mut game = Game::default();
-        game.game_state = GameState::TakeInput;
+        let mut game = Game {
+            state: GameState::TakeInput,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, GRAVITY_TICK - 10);
-        assert_eq!(game.game_state, GameState::TakeInput);
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
@@ -250,9 +254,9 @@ mod tests {
         let mut game = Game::default();
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        let y_1 = game.board.get_shape_pos().clone().unwrap().y;
+        let y_1 = game.board.get_shape_pos().unwrap().y;
         game.drop_shape();
-        let y_2 = game.board.get_shape_pos().clone().unwrap().y;
+        let y_2 = game.board.get_shape_pos().unwrap().y;
         assert!(y_1 < y_2)
     }
 
@@ -261,10 +265,10 @@ mod tests {
         let mut game = Game::default();
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        let y_1 = game.board.get_shape_pos().clone().unwrap().y;
+        let y_1 = game.board.get_shape_pos().unwrap().y;
         game.tick(&inputs, GRAVITY_TICK + 10);
         game.tick(&inputs, 16);
-        let y_2 = game.board.get_shape_pos().clone().unwrap().y;
+        let y_2 = game.board.get_shape_pos().unwrap().y;
         assert!(y_1 < y_2)
     }
 
@@ -279,54 +283,66 @@ mod tests {
 
     #[test]
     fn make_new_shape_state_moves_to_take_input() {
-        let mut game = Game::default();
-        game.game_state = GameState::MakeNewShape;
+        let mut game = Game {
+            state: GameState::MakeNewShape,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        assert_eq!(game.game_state, GameState::TakeInput);
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
     fn take_input_transitions_to_take_input() {
-        let mut game = Game::default();
-        game.game_state = GameState::TakeInput;
+        let mut game = Game {
+            state: GameState::TakeInput,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        assert_eq!(game.game_state, GameState::TakeInput);
+        assert_eq!(game.state, GameState::TakeInput);
     }
 
     #[test]
     fn merge_shape_transitions_to_check_rows() {
-        let mut game = Game::default();
-        game.game_state = GameState::MergeShape;
+        let mut game = Game {
+            state: GameState::MergeShape,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        assert_eq!(game.game_state, GameState::CheckRows);
+        assert_eq!(game.state, GameState::CheckRows);
     }
 
     #[test]
     fn check_rows_transitions_to_check_level() {
-        let mut game = Game::default();
-        game.game_state = GameState::CheckRows;
+        let mut game = Game {
+            state: GameState::CheckRows,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        assert_eq!(game.game_state, GameState::CheckLevel);
+        assert_eq!(game.state, GameState::CheckLevel);
     }
 
     #[test]
     fn check_level_transitions_to_make_new_shape() {
-        let mut game = Game::default();
-        game.game_state = GameState::CheckLevel;
+        let mut game = Game {
+            state: GameState::CheckLevel,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
-        assert_eq!(game.game_state, GameState::MakeNewShape);
+        assert_eq!(game.state, GameState::MakeNewShape);
     }
 
     #[test]
     fn level_stays_zero_below_threshold() {
-        let mut game = Game::default();
-        game.cleared_rows = ROWS_PER_LEVEL - 1;
-        game.game_state = GameState::CheckLevel;
+        let mut game = Game {
+            cleared_rows: ROWS_PER_LEVEL - 1,
+            state: GameState::CheckLevel,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.level, 0);
@@ -334,9 +350,11 @@ mod tests {
 
     #[test]
     fn level_increments_at_threshold() {
-        let mut game = Game::default();
-        game.cleared_rows = ROWS_PER_LEVEL;
-        game.game_state = GameState::CheckLevel;
+        let mut game = Game {
+            cleared_rows: ROWS_PER_LEVEL,
+            state: GameState::CheckLevel,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.level, 1);
@@ -344,9 +362,11 @@ mod tests {
 
     #[test]
     fn level_jumps_multiple_thresholds_in_one_clear() {
-        let mut game = Game::default();
-        game.cleared_rows = ROWS_PER_LEVEL * 2;
-        game.game_state = GameState::CheckLevel;
+        let mut game = Game {
+            cleared_rows: ROWS_PER_LEVEL * 2,
+            state: GameState::CheckLevel,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.level, 2);
@@ -357,7 +377,7 @@ mod tests {
         let mut game = Game::default();
         let tick_0 = game.gravity_tick;
         game.cleared_rows = ROWS_PER_LEVEL;
-        game.game_state = GameState::CheckLevel;
+        game.state = GameState::CheckLevel;
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert!(game.gravity_tick < tick_0);
@@ -368,7 +388,7 @@ mod tests {
         let mut game = Game::default();
         let tick_0 = game.gravity_tick;
         game.cleared_rows = ROWS_PER_LEVEL - 1;
-        game.game_state = GameState::CheckLevel;
+        game.state = GameState::CheckLevel;
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.gravity_tick, tick_0);
@@ -382,8 +402,10 @@ mod tests {
 
     #[test]
     fn get_gravity_decreases_as_level_increases() {
-        let mut game = Game::default();
-        game.level = 1;
+        let mut game = Game {
+            level: 1,
+            ..Default::default()
+        };
         let tick_1 = get_gravity(game.level);
         game.level = 2;
         let tick_2 = get_gravity(game.level);
@@ -393,8 +415,10 @@ mod tests {
 
     #[test]
     fn get_frame_reports_current_level() {
-        let mut game = Game::default();
-        game.level = 3;
+        let game = Game {
+            level: 3,
+            ..Default::default()
+        };
         assert_eq!(game.get_frame().level, 3);
     }
 
@@ -433,7 +457,7 @@ mod tests {
     fn merging_with_no_full_rows_does_not_change_score() {
         let mut game = Game::default();
         game.tick(&[], 1); // spawn shape → TakeInput
-        game.game_state = GameState::CheckRows;
+        game.state = GameState::CheckRows;
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.score, 0);
@@ -441,8 +465,10 @@ mod tests {
 
     #[test]
     fn get_frame_reports_current_score() {
-        let mut game = Game::default();
-        game.score = 4200;
+        let game = Game {
+            score: 4200,
+            ..Default::default()
+        };
         assert_eq!(game.get_frame().score, 4200);
     }
 
@@ -451,44 +477,50 @@ mod tests {
         let mut game = Game::default();
         game.tick(&[], 1); // spawn shape → TakeInput
         game.tick(&[Input::HardDrop], 1);
-        assert_eq!(game.game_state, GameState::MergeShape);
+        assert_eq!(game.state, GameState::MergeShape);
     }
 
     #[test]
     fn hard_drop_wins_over_gravity_due_in_the_same_tick() {
         let mut game = Game::default();
         game.tick(&[], 1); // spawn shape → TakeInput
-        game.game_state = GameState::TakeInput;
+        game.state = GameState::TakeInput;
         let inputs = [Input::HardDrop];
         game.tick(&inputs, GRAVITY_TICK + 1);
-        assert_eq!(game.game_state, GameState::MergeShape);
+        assert_eq!(game.state, GameState::MergeShape);
     }
 
     #[test]
     fn game_over_stays_in_game_over() {
-        let mut game = Game::default();
-        game.game_state = GameState::GameOver;
+        let mut game = Game {
+            state: GameState::GameOver,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, GRAVITY_TICK + 1);
-        assert_eq!(game.game_state, GameState::GameOver)
+        assert_eq!(game.state, GameState::GameOver)
     }
 
     #[test]
     fn game_in_pause_stays_in_pause() {
-        let mut game = Game::default();
-        game.game_state = GameState::Pause;
+        let mut game = Game {
+            state: GameState::Pause,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 16);
-        assert_eq!(game.game_state, GameState::Pause)
+        assert_eq!(game.state, GameState::Pause)
     }
 
     #[test]
     fn game_in_pause_goes_to_take_input_on_pause() {
-        let mut game = Game::default();
-        game.game_state = GameState::Pause;
+        let mut game = Game {
+            state: GameState::Pause,
+            ..Default::default()
+        };
         let inputs: [Input; 1] = [Input::Pause];
         game.tick(&inputs, 16);
-        assert_eq!(game.game_state, GameState::TakeInput)
+        assert_eq!(game.state, GameState::TakeInput)
     }
 
     #[test]
@@ -496,13 +528,13 @@ mod tests {
         // Arrange a shape and a non-input state.
         let mut game = Game::default();
         game.make_new_shape();
-        game.game_state = GameState::DropShape;
+        game.state = GameState::DropShape;
         // Pass input into game and move to TakeInput state
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, 16);
         let x_0 = game.board.get_shape_pos().unwrap().x;
         // Iter through to next TakeInput state.
-        while game.game_state != GameState::TakeInput {
+        while game.state != GameState::TakeInput {
             let inputs: [Input; 0] = [];
             game.tick(&inputs, 16);
         }
@@ -518,13 +550,13 @@ mod tests {
         // Arrange a shape and a non-input state.
         let mut game = Game::default();
         game.make_new_shape();
-        game.game_state = GameState::DropShape;
+        game.state = GameState::DropShape;
         // Pass input into game and move to TakeInput state
         let inputs: [Input; 2] = [Input::Left, Input::Left];
         game.tick(&inputs, 16);
         let x_0 = game.board.get_shape_pos().unwrap().x;
         // Iter through to next TakeInput state.
-        while game.game_state != GameState::TakeInput {
+        while game.state != GameState::TakeInput {
             let inputs: [Input; 0] = [];
             game.tick(&inputs, 16);
         }
@@ -539,10 +571,10 @@ mod tests {
     fn move_on_gravity_tick_drops_gravity() {
         let mut game = Game::default();
         game.tick(&[], 1); // spawn shape → TakeInput
-        game.game_state = GameState::TakeInput;
+        game.state = GameState::TakeInput;
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
-        assert_eq!(game.game_state, GameState::DropShape)
+        assert_eq!(game.state, GameState::DropShape)
     }
 
     #[test]
@@ -551,7 +583,7 @@ mod tests {
         let mut game = Game::default();
         game.make_new_shape();
         let x_0 = game.board.get_shape_pos().unwrap().x;
-        game.game_state = GameState::TakeInput;
+        game.state = GameState::TakeInput;
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
         let x_1 = game.board.get_shape_pos().unwrap().x;
@@ -564,7 +596,7 @@ mod tests {
         let mut game = Game::default();
         game.make_new_shape();
         let x_0 = game.board.get_shape_pos().unwrap().x;
-        game.game_state = GameState::TakeInput;
+        game.state = GameState::TakeInput;
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, GRAVITY_TICK + 1);
         // Game state now DropShape
@@ -583,7 +615,7 @@ mod tests {
         let mut game = Game::default();
         game.make_new_shape();
         let x_0 = game.board.get_shape_pos().unwrap().x;
-        game.game_state = GameState::TakeInput;
+        game.state = GameState::TakeInput;
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, 1);
         let x_1 = game.board.get_shape_pos().unwrap().x;
@@ -607,21 +639,23 @@ mod tests {
         game.tick(&[], 1); // spawn shape, enters TakeInput
         let inputs: [Input; 1] = [Input::Left];
         game.tick(&inputs, 16);
-        assert_eq!(game.game_state, GameState::DropShape);
+        assert_eq!(game.state, GameState::DropShape);
     }
 
     #[test]
     fn non_pause_from_before_make_shape_is_dropped() {
         // Arrange a shape and a non-input state.
-        let mut game = Game::default();
-        game.input_buffer = vec![
-            Input::Left,
-            Input::Left,
-            Input::Right,
-            Input::Pause,
-            Input::SoftDrop,
-        ];
-        game.game_state = GameState::MakeNewShape;
+        let mut game = Game {
+            input_buffer: vec![
+                Input::Left,
+                Input::Left,
+                Input::Right,
+                Input::Pause,
+                Input::SoftDrop,
+            ],
+            state: GameState::MakeNewShape,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.input_buffer, vec![Input::Pause]);
@@ -630,15 +664,17 @@ mod tests {
     #[test]
     fn game_over_drains_input() {
         // Arrange a shape and a non-input state.
-        let mut game = Game::default();
-        game.input_buffer = vec![
-            Input::Left,
-            Input::Left,
-            Input::Right,
-            Input::Pause,
-            Input::SoftDrop,
-        ];
-        game.game_state = GameState::GameOver;
+        let mut game = Game {
+            input_buffer: vec![
+                Input::Left,
+                Input::Left,
+                Input::Right,
+                Input::Pause,
+                Input::SoftDrop,
+            ],
+            state: GameState::GameOver,
+            ..Default::default()
+        };
         let inputs: [Input; 0] = [];
         game.tick(&inputs, 1);
         assert_eq!(game.input_buffer, vec![]);
