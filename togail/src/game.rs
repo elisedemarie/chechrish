@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use crate::{
     Frame, GRAVITY_TICK, Input,
-    board::{Board, Move, MoveOutcome, Rotation, SpawnOutcome},
+    board::{Board, DropOutcome, Move, Rotation, SpawnOutcome},
     random::get_random_shape_type,
 };
 
@@ -93,9 +93,9 @@ impl Game {
 
     fn drop_shape(&mut self) -> GameState {
         self.clock = 0;
-        match self.board.move_shape(Move::Drop) {
-            MoveOutcome::Failed => GameState::MergeShape,
-            MoveOutcome::Moved => GameState::TakeInput,
+        match self.board.drop_shape() {
+            DropOutcome::Landed => GameState::MergeShape,
+            DropOutcome::Dropped => GameState::TakeInput,
         }
     }
 
@@ -184,6 +184,7 @@ impl Game {
             board: buffer,
             score: self.score,
             level: self.level,
+            ghost: self.board.get_ghost(),
         }
     }
 }

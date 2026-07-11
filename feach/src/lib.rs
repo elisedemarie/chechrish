@@ -3,6 +3,7 @@ use togail::{COLS, Frame, Input, ROWS};
 
 pub const WHITE: u32 = 0x00FF_FFFF;
 pub const BLACK: u32 = 0x0000_0000;
+pub const GHOST: u32 = 0x0055_5555;
 
 pub fn board_to_pixels(board: &[[bool; COLS]; ROWS], scale: usize) -> Vec<u32> {
     let width = COLS * scale;
@@ -22,6 +23,20 @@ pub fn board_to_pixels(board: &[[bool; COLS]; ROWS], scale: usize) -> Vec<u32> {
     }
 
     pixels
+}
+
+pub fn overlay_ghost(pixels: &mut [u32], ghost: &[(usize, usize); 4], scale: usize) {
+    let width = COLS * scale;
+    for &(col, row) in ghost {
+        for dy in 0..scale {
+            for dx in 0..scale {
+                let idx = (row * scale + dy) * width + (col * scale + dx);
+                if pixels[idx] == BLACK {
+                    pixels[idx] = GHOST;
+                }
+            }
+        }
+    }
 }
 
 pub const SCALE: usize = 32;
@@ -137,7 +152,10 @@ pub fn run(mut frame_source: impl FnMut(&[Input], u32) -> Frame) {
 
         let inputs = input_handler.process(&raw, 16);
         let frame = frame_source(&inputs, 16);
-        let pixels = board_to_pixels(&frame.board, SCALE);
+        let mut pixels = board_to_pixels(&frame.board, SCALE);
+        if let Some(ghost) = &frame.ghost {
+            overlay_ghost(&mut pixels, ghost, SCALE);
+        }
 
         window
             .update_with_buffer(&pixels, WIDTH, HEIGHT)
@@ -281,6 +299,61 @@ mod tests {
         assert_eq!(pixels[3 * COLS + 2], WHITE);
         assert_eq!(pixels[3 * COLS + 1], BLACK);
         assert_eq!(pixels[2 * COLS + 2], BLACK);
+    }
+
+    // overlay_ghost tests
+
+    fn ghost_at(col: usize, row: usize) -> [(usize, usize); 4] {
+        [(col, row), (col + 1, row), (col, row + 1), (col + 1, row + 1)]
+    }
+
+    #[test]
+    fn ghost_cell_renders_as_ghost_colour() {
+        let mut pixels = board_to_pixels(&empty_board(), 1);
+        overlay_ghost(&mut pixels, &ghost_at(0, 0), 1);
+        assert_eq!(pixels[0], GHOST);
+    }
+
+    #[test]
+    fn ghost_does_not_overwrite_active_piece_cells() {
+        let mut pixels = board_to_pixels(&board_with_cell(0, 0), 1);
+        overlay_ghost(&mut pixels, &ghost_at(0, 0), 1);
+        assert_eq!(pixels[0], WHITE);
+    }
+
+    #[test]
+    fn ghost_does_not_affect_non_ghost_pixels() {
+        let mut pixels = board_to_pixels(&empty_board(), 1);
+        overlay_ghost(&mut pixels, &ghost_at(0, 0), 1);
+        assert_eq!(pixels[5], BLACK);
+    }
+
+    #[test]
+    fn ghost_renders_full_scaled_block() {
+        let scale = 4;
+        let width = COLS * scale;
+        let mut pixels = board_to_pixels(&empty_board(), scale);
+        let ghost = [(1usize, 1usize), (2, 1), (1, 2), (2, 2)];
+        overlay_ghost(&mut pixels, &ghost, scale);
+        for dy in 0..scale {
+            for dx in 0..scale {
+                let idx = (1 * scale + dy) * width + (1 * scale + dx);
+                assert_eq!(pixels[idx], GHOST, "expected GHOST at dy={dy} dx={dx}");
+            }
+        }
+    }
+
+    #[test]
+    fn ghost_overlapping_piece_leaves_piece_white_and_non_overlap_as_ghost() {
+        let scale = 1;
+        let mut board = empty_board();
+        board[0][0] = true;
+        let mut pixels = board_to_pixels(&board, scale);
+        let ghost = [(0usize, 0usize), (1, 0), (0, 1), (1, 1)];
+        overlay_ghost(&mut pixels, &ghost, scale);
+        assert_eq!(pixels[0], WHITE);
+        assert_eq!(pixels[1], GHOST);
+        assert_eq!(pixels[COLS], GHOST);
     }
 
     // map_key tests

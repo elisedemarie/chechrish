@@ -19,4 +19,5 @@ pub struct Frame {
     pub board: [[bool; COLS]; ROWS],
     pub score: u32,
     pub level: u32,
+    pub ghost: Option<[(usize, usize); 4]>,
 }

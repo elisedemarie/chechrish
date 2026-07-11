@@ -92,7 +92,7 @@ impl ShapeType {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Orientation {
     North,
     East,
@@ -100,7 +100,7 @@ pub enum Orientation {
     West,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Shape {
     pub shape_type: ShapeType,
     pub orientation: Orientation,
